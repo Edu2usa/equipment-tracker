@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Equipment – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ action }} Equipment</h1>
+  <a href="{{ url_for('equipment') }}" class="btn btn-outline">&#8592; Back</a>
+</div>
+
+<div class="card form-card">
+  <form method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="name">Equipment Name</label>
+        <input type="text" id="name" name="name" class="form-control"
+               value="{{ item.name if item else '' }}" placeholder="e.g. Laptop Dell XPS" required />
+      </div>
+      <div class="form-group">
+        <label for="equipment_type">Equipment Type</label>
+        <input type="text" id="equipment_type" name="equipment_type" class="form-control"
+               value="{{ item.equipment_type if item else '' }}" placeholder="e.g. Laptop, Printer..." required />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="account_id">Account</label>
+        <select id="account_id" name="account_id" class="form-control" required>
+          <option value="">— Select Account —</option>
+          {% for acct in accounts %}
+          <option value="{{ acct.id }}" {% if item and item.account_id == acct.id %}selected{% endif %}>
+            {{ acct.name }} ({{ acct.location }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" name="quantity" class="form-control"
+               value="{{ item.quantity if item else 1 }}" min="1" required />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="item_status">Status</label>
+        <select id="item_status" name="item_status" class="form-control">
+          {% for val, label in [('working','Working'), ('in_repair','In Repair'), ('in_storage','In Storage')] %}
+          <option value="{{ val }}" {% if item and item.item_status == val %}selected{% elif not item and val == 'working' %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="last_service_date">Last Service Date</label>
+        <input type="date" id="last_service_date" name="last_service_date" class="form-control"
+               value="{{ item.last_service_date.isoformat() if item and item.last_service_date else '' }}" />
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ action }} Equipment</button>
+      <a href="{{ url_for('equipment') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

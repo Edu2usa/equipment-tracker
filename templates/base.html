@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Preferred Maintenance{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- ── NAV ────────────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <!-- Logo -->
+      <a href="{{ url_for('dashboard') }}" class="logo-link">
+        <span class="logo-icon">
+          <svg width="32" height="28" viewBox="0 0 32 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="16,0 32,12 26,12 16,4 6,12 0,12" fill="#c0392b"/>
+            <polygon points="16,8 32,20 26,20 16,12 6,20 0,20" fill="#c0392b"/>
+            <polygon points="16,16 32,28 26,28 16,20 6,28 0,28" fill="#922b21"/>
+          </svg>
+        </span>
+        <span class="logo-text">
+          <span class="logo-preferred">Preferred</span>
+          <span class="logo-maintenance">Maintenance</span>
+        </span>
+      </a>
+
+      <!-- Nav links -->
+      <nav class="main-nav">
+        <a href="{{ url_for('dashboard') }}"  class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('accounts') }}"   class="nav-link {% if 'account' in request.endpoint %}active{% endif %}">Accounts</a>
+        <a href="{{ url_for('equipment') }}"  class="nav-link {% if 'equipment' in request.endpoint %}active{% endif %}">Equipment</a>
+        <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in request.endpoint %}active{% endif %}">Maintenance</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ── FLASH MESSAGES ─────────────────────────────────────────── -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ── PAGE CONTENT ───────────────────────────────────────────── -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; {{ 2026 }} Preferred Maintenance &mdash; Equipment Tracker</p>
+  </footer>
+
+</body>
+</html>

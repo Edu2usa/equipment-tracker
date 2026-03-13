@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Account – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ action }} Account</h1>
+  <a href="{{ url_for('accounts') }}" class="btn btn-outline">&#8592; Back</a>
+</div>
+
+<div class="card form-card">
+  <form method="POST">
+    <div class="form-group">
+      <label for="name">Account Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ account.name if account else '' }}" placeholder="e.g. Downtown Office A" required />
+    </div>
+
+    <div class="form-group">
+      <label for="account_type">Type</label>
+      <select id="account_type" name="account_type" class="form-control">
+        {% for val, label in [('client','Client'), ('warehouse','Warehouse'), ('spare_pool','Spare Pool')] %}
+        <option value="{{ val }}" {% if account and account.account_type == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="location">Location</label>
+      <input type="text" id="location" name="location" class="form-control"
+             value="{{ account.location if account else '' }}" placeholder="e.g. New York" required />
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ action }} Account</button>
+      <a href="{{ url_for('accounts') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

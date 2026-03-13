@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Accounts – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Accounts</h1>
+  <a href="{{ url_for('add_account') }}" class="btn btn-primary">+ Add Account</a>
+</div>
+
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>NAME</th>
+        <th>TYPE</th>
+        <th>LOCATION</th>
+        <th>EQUIPMENT</th>
+        <th>ACTIONS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for acct in accounts %}
+      <tr>
+        <td class="bold">{{ acct.name }}</td>
+        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type }}</span></td>
+        <td>{{ acct.location }}</td>
+        <td>{{ acct.equipment_count() }}</td>
+        <td class="actions-cell">
+          <a href="{{ url_for('edit_account', account_id=acct.id) }}" class="btn btn-sm btn-outline">Edit</a>
+          <form method="POST" action="{{ url_for('delete_account', account_id=acct.id) }}"
+                onsubmit="return confirm('Delete account {{ acct.name }}?');" style="display:inline;">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty-row">No accounts yet. <a href="{{ url_for('add_account') }}">Add one.</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

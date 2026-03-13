@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Log Maintenance – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Log Maintenance</h1>
+  <a href="{{ url_for('maintenance') }}" class="btn btn-outline">&#8592; Back</a>
+</div>
+
+<div class="card form-card">
+  <form method="POST">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="equipment_id">Equipment</label>
+        <select id="equipment_id" name="equipment_id" class="form-control" required>
+          <option value="">— Select Equipment —</option>
+          {% for eq in equipment_list %}
+          <option value="{{ eq.id }}">{{ eq.name }} – {{ eq.account.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="maintenance_type">Maintenance Type</label>
+        <input type="text" id="maintenance_type" name="maintenance_type" class="form-control"
+               placeholder="e.g. Repair, Service, Inspection" required />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="service_date">Service Date</label>
+        <input type="date" id="service_date" name="service_date" class="form-control"
+               value="{{ today }}" required />
+      </div>
+      <div class="form-group form-group-checkbox">
+        <label class="checkbox-label">
+          <input type="checkbox" name="mark_working" value="yes" />
+          Mark equipment as <strong>Working</strong> after this service
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" class="form-control" rows="4"
+                placeholder="Optional details about the work performed..."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save Record</button>
+      <a href="{{ url_for('maintenance') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

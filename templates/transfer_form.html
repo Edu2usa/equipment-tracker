@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Transfer Equipment – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Transfer Equipment</h1>
+  <a href="{{ url_for('equipment') }}" class="btn btn-outline">&#8592; Back</a>
+</div>
+
+<div class="card form-card">
+  <div class="transfer-info">
+    <p><strong>Item:</strong> {{ item.name }}</p>
+    <p><strong>Current Account:</strong> {{ item.account.name }} ({{ item.account.location }})</p>
+    <p><strong>Quantity:</strong> {{ item.quantity }}</p>
+  </div>
+
+  <form method="POST">
+    <div class="form-group">
+      <label for="account_id">Transfer To</label>
+      <select id="account_id" name="account_id" class="form-control" required>
+        <option value="">— Select Destination Account —</option>
+        {% for acct in accounts %}
+        {% if acct.id != item.account_id %}
+        <option value="{{ acct.id }}">{{ acct.name }} – {{ acct.location }} ({{ acct.account_type }})</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">&#8646; Confirm Transfer</button>
+      <a href="{{ url_for('equipment') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

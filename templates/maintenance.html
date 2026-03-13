@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Maintenance History – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Maintenance History</h1>
+  <a href="{{ url_for('add_maintenance') }}" class="btn btn-primary">+ Log Maintenance</a>
+</div>
+
+<!-- Search -->
+<div class="card filter-card">
+  <form method="GET" class="filter-form">
+    <input type="text" name="search" class="form-control" placeholder="Search by equipment name..."
+           value="{{ search }}" />
+    <button type="submit" class="btn btn-primary">Search</button>
+    <a href="{{ url_for('maintenance') }}" class="btn btn-outline">Clear</a>
+  </form>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>EQUIPMENT</th>
+        <th>ACCOUNT</th>
+        <th>TYPE</th>
+        <th>DATE</th>
+        <th>NOTES</th>
+        <th>ACTIONS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td class="bold">{{ r.equipment.name }}</td>
+        <td>{{ r.equipment.account.name }}</td>
+        <td>{{ r.maintenance_type }}</td>
+        <td>{{ r.service_date.strftime('%b %d, %Y') }}</td>
+        <td class="notes-cell">{{ r.notes or '—' }}</td>
+        <td class="actions-cell">
+          <form method="POST" action="{{ url_for('delete_maintenance', record_id=r.id) }}"
+                onsubmit="return confirm('Delete this record?');" style="display:inline;">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-row">No maintenance records yet. <a href="{{ url_for('add_maintenance') }}">Log one.</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
