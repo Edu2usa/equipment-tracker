@@ -5,7 +5,8 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///equip_tracker.db'
+db_path = os.environ.get('DATABASE_URL', 'sqlite:////tmp/equip_tracker.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
