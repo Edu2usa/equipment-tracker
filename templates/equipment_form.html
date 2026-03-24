@@ -9,22 +9,39 @@
 
 <div class="card form-card">
   <form method="POST">
+
+    {% if item and item.equip_id %}
+    <div class="equip-id-badge">
+      <span class="equip-id-label">Equipment ID</span>
+      <span class="equip-id-value">{{ item.equip_id }}</span>
+    </div>
+    {% endif %}
+
     <div class="form-row">
       <div class="form-group">
         <label for="name">Equipment Name</label>
-        <input type="text" id="name" name="name" class="form-control"
-               value="{{ item.name if item else '' }}" placeholder="e.g. Laptop Dell XPS" required />
+        <select id="name" name="name" class="form-control" required>
+          <option value="">— Select Equipment —</option>
+          {% for n in equip_names %}
+          <option value="{{ n }}" {% if item and item.name == n %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="form-group">
         <label for="equipment_type">Equipment Type</label>
-        <input type="text" id="equipment_type" name="equipment_type" class="form-control"
-               value="{{ item.equipment_type if item else '' }}" placeholder="e.g. Laptop, Printer..." required />
+        <select id="equipment_type" name="equipment_type" class="form-control" required>
+          <option value="">— Select Type —</option>
+          {% for t in equip_types %}
+          <option value="{{ t }}" {% if item and item.equipment_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
       </div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label for="account_id">Account</label>
+        {% if accounts %}
         <select id="account_id" name="account_id" class="form-control" required>
           <option value="">— Select Account —</option>
           {% for acct in accounts %}
@@ -33,6 +50,12 @@
           </option>
           {% endfor %}
         </select>
+        {% else %}
+        <div class="no-accounts-warning">
+          No accounts found. <a href="{{ url_for('add_account') }}">Create an account first</a>.
+        </div>
+        <input type="hidden" name="account_id" value="" />
+        {% endif %}
       </div>
       <div class="form-group">
         <label for="quantity">Quantity</label>
