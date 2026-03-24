@@ -38,3 +38,15 @@ class MaintenanceRecord(db.Model):
     service_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EquipmentName(db.Model):
+    __tablename__ = 'equipment_names'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+
+
+class EquipmentType(db.Model):
+    __tablename__ = 'equipment_types'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
