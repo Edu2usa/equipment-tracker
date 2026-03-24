@@ -6,21 +6,38 @@
   <h1>Reports</h1>
 </div>
 
-<!-- ── Backpack Vacuum Report ─────────────────────────────────── -->
+<!-- ── Equipment Picker ───────────────────────────────────────── -->
+<div class="card mb-4">
+  <form method="get" action="{{ url_for('reports') }}" class="filter-bar">
+    <label for="name-select" class="filter-label">View by Equipment:</label>
+    <select id="name-select" name="name" class="form-select" onchange="this.form.submit()">
+      <option value="">— All Equipment Summary —</option>
+      {% for n in available_names %}
+      <option value="{{ n }}" {% if n == selected_name %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+    {% if not available_names %}
+    <span class="text-muted">No equipment added yet.</span>
+    {% endif %}
+  </form>
+</div>
+
+{% if selected_name %}
+<!-- ── Per-Equipment Account Breakdown ───────────────────────── -->
 <div class="report-section">
   <div class="report-header">
     <div>
-      <h2 class="report-title">Backpack Vacuum Inventory</h2>
-      <p class="report-subtitle">Total count across all accounts</p>
+      <h2 class="report-title">{{ selected_name }} – By Account</h2>
+      <p class="report-subtitle">Distribution across all accounts</p>
     </div>
     <div class="report-kpi">
-      <span class="kpi-value">{{ backpack_total }}</span>
+      <span class="kpi-value">{{ detail_total }}</span>
       <span class="kpi-label">Total Units</span>
     </div>
   </div>
 
   <div class="card mt-4">
-    {% if backpack_by_account %}
+    {% if detail_by_account %}
     <table class="data-table">
       <thead>
         <tr>
@@ -30,10 +47,11 @@
           <th>Total</th>
           <th>Working</th>
           <th>In Repair</th>
+          <th>In Storage</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in backpack_by_account %}
+        {% for row in detail_by_account %}
         <tr>
           <td class="bold">{{ row.account_name }}</td>
           <td>{{ row.location }}</td>
@@ -43,26 +61,30 @@
           <td>
             {% if row.repair_qty > 0 %}
             <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
-            {% else %}
-            <span style="color:var(--gray-400)">—</span>
-            {% endif %}
+            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+          </td>
+          <td>
+            {% if row.storage_qty > 0 %}
+            <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
+            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <p class="empty-row">No backpack vacuums found. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
+    <p class="empty-row">No "{{ selected_name }}" found. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
     {% endif %}
   </div>
 </div>
 
-<!-- ── Equipment Summary ────────────────────────────────────────── -->
+{% else %}
+<!-- ── Full Equipment Summary ─────────────────────────────────── -->
 <div class="report-section">
   <div class="report-header">
     <div>
       <h2 class="report-title">Full Equipment Summary</h2>
-      <p class="report-subtitle">All equipment grouped by name</p>
+      <p class="report-subtitle">All equipment grouped by name — select a name above to drill down by account</p>
     </div>
   </div>
 
@@ -76,6 +98,7 @@
           <th>Working</th>
           <th>In Repair</th>
           <th>In Storage</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -87,14 +110,15 @@
           <td>
             {% if row.repair_qty > 0 %}
             <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>
-            {% endif %}
+            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
           </td>
           <td>
             {% if row.storage_qty > 0 %}
             <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>
-            {% endif %}
+            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('reports', name=row.name) }}" class="btn btn-sm btn-outline">By Account</a>
           </td>
         </tr>
         {% endfor %}
@@ -105,5 +129,6 @@
     {% endif %}
   </div>
 </div>
+{% endif %}
 
 {% endblock %}
