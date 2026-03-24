@@ -510,6 +510,14 @@ textarea.form-control { resize: vertical; }
   font-size: .78rem;
 }
 
+
+/* ── Logo Image ───────────────────────────────────────────────── */
+.logo-img {
+  height: 44px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .header-inner { padding: 0 14px; }
