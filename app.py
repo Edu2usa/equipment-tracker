@@ -337,20 +337,19 @@ def delete_maintenance(record_id):
 
 @app.route('/reports')
 def reports():
-    # Equipment count grouped by name
-    from sqlalchemy import func
+    from sqlalchemy import func, case
     name_summary = (
         db.session.query(
             EquipmentItem.name,
             func.sum(EquipmentItem.quantity).label('total_qty'),
             func.sum(
-                db.case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
+                case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
             ).label('working_qty'),
             func.sum(
-                db.case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
+                case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
             ).label('repair_qty'),
             func.sum(
-                db.case((EquipmentItem.item_status == 'in_storage', EquipmentItem.quantity), else_=0)
+                case((EquipmentItem.item_status == 'in_storage', EquipmentItem.quantity), else_=0)
             ).label('storage_qty'),
         )
         .group_by(EquipmentItem.name)
@@ -358,7 +357,6 @@ def reports():
         .all()
     )
 
-    # Backpack vacuum detail: count per account
     backpack_by_account = (
         db.session.query(
             Account.name.label('account_name'),
@@ -366,10 +364,10 @@ def reports():
             Account.account_type,
             func.sum(EquipmentItem.quantity).label('qty'),
             func.sum(
-                db.case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
+                case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
             ).label('working_qty'),
             func.sum(
-                db.case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
+                case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
             ).label('repair_qty'),
         )
         .join(EquipmentItem, EquipmentItem.account_id == Account.id)
