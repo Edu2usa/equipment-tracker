@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Preferred Maintenance{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
@@ -11,16 +14,13 @@
   <!-- ── NAV ────────────────────────────────────────────────────── -->
   <header class="site-header">
     <div class="header-inner">
-      <!-- Logo -->
       <a href="{{ url_for('dashboard') }}" class="logo-link">
         <img src="{{ url_for('static', filename='PM.jpg') }}" alt="Preferred Maintenance Logo" class="logo-img" />
       </a>
-
-      <!-- Nav links -->
       <nav class="main-nav">
-        <a href="{{ url_for('dashboard') }}"  class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
-        <a href="{{ url_for('accounts') }}"   class="nav-link {% if 'account' in request.endpoint %}active{% endif %}">Accounts</a>
-        <a href="{{ url_for('equipment') }}"  class="nav-link {% if 'equipment' in request.endpoint %}active{% endif %}">Equipment</a>
+        <a href="{{ url_for('dashboard') }}"   class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('accounts') }}"    class="nav-link {% if 'account' in request.endpoint %}active{% endif %}">Accounts</a>
+        <a href="{{ url_for('equipment') }}"   class="nav-link {% if 'equipment' in request.endpoint %}active{% endif %}">Equipment</a>
         <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in request.endpoint %}active{% endif %}">Maintenance</a>
       </nav>
     </div>
