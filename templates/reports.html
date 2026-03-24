@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Reports – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Reports</h1>
+</div>
+
+<!-- ── Backpack Vacuum Report ─────────────────────────────────── -->
+<div class="report-section">
+  <div class="report-header">
+    <div>
+      <h2 class="report-title">Backpack Vacuum Inventory</h2>
+      <p class="report-subtitle">Total count across all accounts</p>
+    </div>
+    <div class="report-kpi">
+      <span class="kpi-value">{{ backpack_total }}</span>
+      <span class="kpi-label">Total Units</span>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    {% if backpack_by_account %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Location</th>
+          <th>Type</th>
+          <th>Total</th>
+          <th>Working</th>
+          <th>In Repair</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in backpack_by_account %}
+        <tr>
+          <td class="bold">{{ row.account_name }}</td>
+          <td>{{ row.location }}</td>
+          <td><span class="badge badge-{{ row.account_type }}">{{ row.account_type.replace('_', ' ').title() }}</span></td>
+          <td class="bold">{{ row.qty }}</td>
+          <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
+          <td>
+            {% if row.repair_qty > 0 %}
+            <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
+            {% else %}
+            <span style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-row">No backpack vacuums found. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Equipment Summary ────────────────────────────────────────── -->
+<div class="report-section">
+  <div class="report-header">
+    <div>
+      <h2 class="report-title">Full Equipment Summary</h2>
+      <p class="report-subtitle">All equipment grouped by name</p>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    {% if name_summary %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Equipment Name</th>
+          <th>Total Units</th>
+          <th>Working</th>
+          <th>In Repair</th>
+          <th>In Storage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in name_summary %}
+        <tr>
+          <td class="bold">{{ row.name }}</td>
+          <td class="bold">{{ row.total_qty }}</td>
+          <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
+          <td>
+            {% if row.repair_qty > 0 %}
+            <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
+            {% else %}<span style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.storage_qty > 0 %}
+            <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
+            {% else %}<span style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-row">No equipment found. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
