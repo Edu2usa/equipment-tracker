@@ -15,13 +15,25 @@
   <header class="site-header">
     <div class="header-inner">
       <a href="{{ url_for('dashboard') }}" class="logo-link">
-        <img src="{{ url_for('static', filename='PM.jpg') }}" alt="Preferred Maintenance Logo" class="logo-img" />
+        <span class="logo-icon">
+          <svg width="32" height="28" viewBox="0 0 32 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="16,0 32,12 26,12 16,4 6,12 0,12" fill="#3b82f6"/>
+            <polygon points="16,8 32,20 26,20 16,12 6,20 0,20" fill="#3b82f6"/>
+            <polygon points="16,16 32,28 26,28 16,20 6,28 0,28" fill="#2563eb"/>
+          </svg>
+        </span>
+        <span class="logo-text">
+          <span class="logo-preferred">Preferred</span>
+          <span class="logo-maintenance">Maintenance</span>
+        </span>
       </a>
+
       <nav class="main-nav">
         <a href="{{ url_for('dashboard') }}"   class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
         <a href="{{ url_for('accounts') }}"    class="nav-link {% if 'account' in request.endpoint %}active{% endif %}">Accounts</a>
         <a href="{{ url_for('equipment') }}"   class="nav-link {% if 'equipment' in request.endpoint %}active{% endif %}">Equipment</a>
         <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in request.endpoint %}active{% endif %}">Maintenance</a>
+        <a href="{{ url_for('reports') }}"     class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
       </nav>
     </div>
   </header>
