@@ -20,6 +20,7 @@ class Account(db.Model):
 class EquipmentItem(db.Model):
     __tablename__ = 'equipment_items'
     id = db.Column(db.Integer, primary_key=True)
+    equip_id = db.Column(db.String(20), nullable=True, unique=True)  # e.g. EQ-0001
     name = db.Column(db.String(120), nullable=False)
     equipment_type = db.Column(db.String(80), nullable=False)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
