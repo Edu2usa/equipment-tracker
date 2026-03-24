@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Settings – Preferred Maintenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Settings</h1>
+  <p class="page-subtitle">Manage the equipment names and types available in dropdowns.</p>
+</div>
+
+<div class="settings-grid">
+
+  <!-- ── Equipment Names ──────────────────────────────────────── -->
+  <div class="settings-panel">
+    <div class="settings-panel-header">
+      <h2>Equipment Names</h2>
+      <p>These appear in the Name dropdown when adding or editing equipment.</p>
+    </div>
+
+    <!-- Add new name -->
+    <form method="post" action="{{ url_for('add_equip_name') }}" class="inline-add-form">
+      <input type="text" name="name" placeholder="New equipment name…" class="form-input" required>
+      <button type="submit" class="btn btn-primary btn-sm">Add</button>
+    </form>
+
+    <!-- List -->
+    <ul class="settings-list">
+      {% for rec in names %}
+      <li class="settings-item">
+        <form method="post" action="{{ url_for('edit_equip_name', name_id=rec.id) }}" class="settings-edit-form">
+          <input type="text" name="name" value="{{ rec.name }}" class="form-input form-input-sm" required>
+          <button type="submit" class="btn btn-sm btn-outline">Save</button>
+        </form>
+        <form method="post" action="{{ url_for('delete_equip_name', name_id=rec.id) }}"
+              onsubmit="return confirm('Delete {{ rec.name }}?')">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </li>
+      {% else %}
+      <li class="empty-row">No names yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- ── Equipment Types ──────────────────────────────────────── -->
+  <div class="settings-panel">
+    <div class="settings-panel-header">
+      <h2>Equipment Types</h2>
+      <p>These appear in the Type dropdown when adding or editing equipment.</p>
+    </div>
+
+    <!-- Add new type -->
+    <form method="post" action="{{ url_for('add_equip_type') }}" class="inline-add-form">
+      <input type="text" name="name" placeholder="New equipment type…" class="form-input" required>
+      <button type="submit" class="btn btn-primary btn-sm">Add</button>
+    </form>
+
+    <!-- List -->
+    <ul class="settings-list">
+      {% for rec in types %}
+      <li class="settings-item">
+        <form method="post" action="{{ url_for('edit_equip_type', type_id=rec.id) }}" class="settings-edit-form">
+          <input type="text" name="name" value="{{ rec.name }}" class="form-input form-input-sm" required>
+          <button type="submit" class="btn btn-sm btn-outline">Save</button>
+        </form>
+        <form method="post" action="{{ url_for('delete_equip_type', type_id=rec.id) }}"
+              onsubmit="return confirm('Delete {{ rec.name }}?')">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </li>
+      {% else %}
+      <li class="empty-row">No types yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+</div>
+{% endblock %}
