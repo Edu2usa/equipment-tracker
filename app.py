@@ -1,20 +1,62 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from models import db, Account, EquipmentItem, MaintenanceRecord
 from datetime import datetime, date
-from whitenoise import WhiteNoise
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
-db_path = os.environ.get('DATABASE_URL', 'sqlite:////tmp/equip_tracker.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = db_path
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///equip_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
-app.wsgi_app = WhiteNoise(app.wsgi_app, root=os.path.join(os.path.dirname(__file__), 'static'), prefix='static')
 
 with app.app_context():
     db.create_all()
+    # Migration: add equip_id column if it doesn't exist
+    with db.engine.connect() as conn:
+        try:
+            conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN equip_id VARCHAR(20)"))
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
+    # Backfill equip_id for any existing rows that lack it
+    items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
+    for item in items_without_id:
+        item.equip_id = f"EQ-{item.id:04d}"
+    if items_without_id:
+        db.session.commit()
+
+
+# ── Predefined equipment options ──────────────────────────────────────────────
+
+EQUIP_NAMES = [
+    "Backpack Vacuum",
+    "Upright Vacuum",
+    "Canister Vacuum",
+    "Wet/Dry Vacuum",
+    "HEPA Vacuum",
+    "Auto Scrubber – Walk-Behind",
+    "Auto Scrubber – Ride-On",
+    "Floor Buffer / Burnisher",
+    "Carpet Extractor",
+    "Pressure Washer",
+    "Air Mover / Blower",
+    "Mop & Bucket",
+    "Cleaning Cart",
+    "Squeegee Set",
+    "Other",
+]
+
+EQUIP_TYPES = [
+    "Vacuum Equipment",
+    "Floor Care",
+    "Carpet Care",
+    "Pressure Equipment",
+    "Air Movement",
+    "Hand Tools & Accessories",
+    "Carts & Transport",
+    "Other",
+]
 
 
 # ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -119,13 +161,35 @@ def equipment():
 def add_equipment():
     accounts = Account.query.order_by(Account.name).all()
     if request.method == 'POST':
-        name = request.form['name'].strip()
-        equipment_type = request.form['equipment_type'].strip()
-        account_id = int(request.form['account_id'])
-        quantity = int(request.form.get('quantity', 1))
-        item_status = request.form['item_status']
+        name = request.form.get('name', '').strip()
+        equipment_type = request.form.get('equipment_type', '').strip()
+        account_id_raw = request.form.get('account_id', '').strip()
+        quantity_raw = request.form.get('quantity', '1').strip()
+        item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
-        last_service = datetime.strptime(last_service_raw, '%Y-%m-%d').date() if last_service_raw else None
+
+        # Validation
+        if not name or not equipment_type or not account_id_raw:
+            flash('Equipment name, type, and account are required.', 'error')
+            return render_template('equipment_form.html', action='Add', item=None,
+                                   accounts=accounts, equip_names=EQUIP_NAMES,
+                                   equip_types=EQUIP_TYPES)
+
+        try:
+            account_id = int(account_id_raw)
+            quantity = int(quantity_raw) if quantity_raw else 1
+        except ValueError:
+            flash('Invalid account or quantity value.', 'error')
+            return render_template('equipment_form.html', action='Add', item=None,
+                                   accounts=accounts, equip_names=EQUIP_NAMES,
+                                   equip_types=EQUIP_TYPES)
+
+        last_service = None
+        if last_service_raw:
+            try:
+                last_service = datetime.strptime(last_service_raw, '%Y-%m-%d').date()
+            except ValueError:
+                pass
 
         item = EquipmentItem(
             name=name, equipment_type=equipment_type,
@@ -133,10 +197,15 @@ def add_equipment():
             item_status=item_status, last_service_date=last_service
         )
         db.session.add(item)
+        db.session.flush()           # assigns item.id before commit
+        item.equip_id = f"EQ-{item.id:04d}"
         db.session.commit()
-        flash(f'Equipment "{name}" added.', 'success')
+        flash(f'Equipment "{name}" added (ID: {item.equip_id}).', 'success')
         return redirect(url_for('equipment'))
-    return render_template('equipment_form.html', action='Add', item=None, accounts=accounts)
+
+    return render_template('equipment_form.html', action='Add', item=None,
+                           accounts=accounts, equip_names=EQUIP_NAMES,
+                           equip_types=EQUIP_TYPES)
 
 
 @app.route('/equipment/edit/<int:item_id>', methods=['GET', 'POST'])
@@ -144,17 +213,46 @@ def edit_equipment(item_id):
     item = EquipmentItem.query.get_or_404(item_id)
     accounts = Account.query.order_by(Account.name).all()
     if request.method == 'POST':
-        item.name = request.form['name'].strip()
-        item.equipment_type = request.form['equipment_type'].strip()
-        item.account_id = int(request.form['account_id'])
-        item.quantity = int(request.form.get('quantity', 1))
-        item.item_status = request.form['item_status']
+        name = request.form.get('name', '').strip()
+        equipment_type = request.form.get('equipment_type', '').strip()
+        account_id_raw = request.form.get('account_id', '').strip()
+        quantity_raw = request.form.get('quantity', '1').strip()
+        item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
-        item.last_service_date = datetime.strptime(last_service_raw, '%Y-%m-%d').date() if last_service_raw else None
+
+        if not name or not equipment_type or not account_id_raw:
+            flash('Equipment name, type, and account are required.', 'error')
+            return render_template('equipment_form.html', action='Edit', item=item,
+                                   accounts=accounts, equip_names=EQUIP_NAMES,
+                                   equip_types=EQUIP_TYPES)
+
+        try:
+            account_id = int(account_id_raw)
+            quantity = int(quantity_raw) if quantity_raw else 1
+        except ValueError:
+            flash('Invalid account or quantity value.', 'error')
+            return render_template('equipment_form.html', action='Edit', item=item,
+                                   accounts=accounts, equip_names=EQUIP_NAMES,
+                                   equip_types=EQUIP_TYPES)
+
+        item.name = name
+        item.equipment_type = equipment_type
+        item.account_id = account_id
+        item.quantity = quantity
+        item.item_status = item_status
+        item.last_service_date = None
+        if last_service_raw:
+            try:
+                item.last_service_date = datetime.strptime(last_service_raw, '%Y-%m-%d').date()
+            except ValueError:
+                pass
         db.session.commit()
         flash(f'Equipment "{item.name}" updated.', 'success')
         return redirect(url_for('equipment'))
-    return render_template('equipment_form.html', action='Edit', item=item, accounts=accounts)
+
+    return render_template('equipment_form.html', action='Edit', item=item,
+                           accounts=accounts, equip_names=EQUIP_NAMES,
+                           equip_types=EQUIP_TYPES)
 
 
 @app.route('/equipment/delete/<int:item_id>', methods=['POST'])
@@ -213,11 +311,9 @@ def add_maintenance():
         )
         db.session.add(record)
 
-        # Update last_service_date on the equipment
         equip = EquipmentItem.query.get(equipment_id)
         if equip and (equip.last_service_date is None or service_date > equip.last_service_date):
             equip.last_service_date = service_date
-            # If it was in_repair and maintenance is logged, optionally set to working
             if request.form.get('mark_working') == 'yes':
                 equip.item_status = 'working'
 
@@ -235,6 +331,60 @@ def delete_maintenance(record_id):
     db.session.commit()
     flash('Maintenance record deleted.', 'success')
     return redirect(url_for('maintenance'))
+
+
+# ─── Reports ─────────────────────────────────────────────────────────────────
+
+@app.route('/reports')
+def reports():
+    # Equipment count grouped by name
+    from sqlalchemy import func
+    name_summary = (
+        db.session.query(
+            EquipmentItem.name,
+            func.sum(EquipmentItem.quantity).label('total_qty'),
+            func.sum(
+                db.case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
+            ).label('working_qty'),
+            func.sum(
+                db.case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
+            ).label('repair_qty'),
+            func.sum(
+                db.case((EquipmentItem.item_status == 'in_storage', EquipmentItem.quantity), else_=0)
+            ).label('storage_qty'),
+        )
+        .group_by(EquipmentItem.name)
+        .order_by(EquipmentItem.name)
+        .all()
+    )
+
+    # Backpack vacuum detail: count per account
+    backpack_by_account = (
+        db.session.query(
+            Account.name.label('account_name'),
+            Account.location,
+            Account.account_type,
+            func.sum(EquipmentItem.quantity).label('qty'),
+            func.sum(
+                db.case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
+            ).label('working_qty'),
+            func.sum(
+                db.case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
+            ).label('repair_qty'),
+        )
+        .join(EquipmentItem, EquipmentItem.account_id == Account.id)
+        .filter(EquipmentItem.name == 'Backpack Vacuum')
+        .group_by(Account.id)
+        .order_by(Account.name)
+        .all()
+    )
+
+    backpack_total = sum(r.qty for r in backpack_by_account)
+
+    return render_template('reports.html',
+                           name_summary=name_summary,
+                           backpack_by_account=backpack_by_account,
+                           backpack_total=backpack_total)
 
 
 if __name__ == '__main__':
