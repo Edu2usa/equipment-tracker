@@ -5,8 +5,14 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/equip_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Use DATABASE_URL env var (Supabase PostgreSQL) if set, else local SQLite for dev
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:////tmp/equip_tracker.db')
+# Supabase/Heroku may return 'postgres://' — SQLAlchemy requires 'postgresql://'
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
 
