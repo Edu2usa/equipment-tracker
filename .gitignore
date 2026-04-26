@@ -6,3 +6,4 @@ instance/
 .env
 .venv/
 venv/
+.vercel/

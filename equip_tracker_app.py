@@ -11,7 +11,12 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///equip_tracker.db'
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///equip_tracker.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+if _db_url.startswith('postgresql://'):
+    _db_url = _db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -66,15 +71,15 @@ with app.app_context():
 CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#1b3a5c;--navy-dark:#152e4a;--red:#c0392b;--red-dark:#922b21;
+  --navy:#241920;--navy-dark:#312126;--red:#cc2434;--red-dark:#a61a27;
   --green:#1e7e34;--amber:#856404;
-  --gray-50:#f4f6f8;--gray-100:#e9ecef;--gray-300:#ced4da;
-  --gray-500:#6c757d;--gray-700:#495057;--gray-900:#212529;
+  --gray-50:#f6f4f5;--gray-100:#f1eaeb;--gray-300:#d9d6d8;
+  --gray-500:#6f6770;--gray-700:#565f6c;--gray-900:#1d2128;
   --white:#ffffff;
   --shadow:0 2px 8px rgba(0,0,0,.12);--radius:8px;--radius-sm:5px;--t:.18s ease;
 }
 html{font-size:15px}
-body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--gray-50);
+body{font-family:'Source Sans 3','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--gray-50);
   color:var(--gray-900);line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
 a{color:inherit;text-decoration:none}
 
@@ -207,13 +212,6 @@ textarea.form-control{resize:vertical}
 }
 """
 
-LOGO_SVG = """
-<svg width="32" height="28" viewBox="0 0 32 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <polygon points="16,0 32,12 26,12 16,4 6,12 0,12" fill="#c0392b"/>
-  <polygon points="16,8 32,20 26,20 16,12 6,20 0,20" fill="#c0392b"/>
-  <polygon points="16,16 32,28 26,28 16,20 6,28 0,28" fill="#922b21"/>
-</svg>"""
-
 BASE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -226,7 +224,7 @@ BASE = """<!DOCTYPE html>
 <header class="site-header">
   <div class="header-inner">
     <a href="{{ url_for('dashboard') }}" class="logo-link">
-      <span class="logo-icon">{{ logo_svg|safe }}</span>
+      <img src="/static/img/preferred-maintenance-logo.png" alt="Preferred Maintenance" class="logo-img">
       <span class="logo-text">
         <span class="logo-preferred">Preferred</span>
         <span class="logo-maintenance">Maintenance</span>
@@ -259,7 +257,6 @@ def render(template_body, **ctx):
     """Wrap a content block inside BASE and render with shared context."""
     full = BASE.replace("{% block content %}{% endblock %}", "{% block content %}" + template_body + "{% endblock %}")
     ctx.setdefault('css', CSS)
-    ctx.setdefault('logo_svg', LOGO_SVG)
     ctx.setdefault('ep', request.endpoint or '')
     return render_template_string(full, **ctx)
 
@@ -772,3 +769,4 @@ if __name__ == '__main__':
     print("Starting Preferred Maintenance Equipment Tracker...")
     print("Open http://localhost:5000 in your browser")
     app.run(debug=True, host='0.0.0.0', port=5000)
+

@@ -9,9 +9,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Use DATABASE_URL env var (Supabase PostgreSQL) if set, else local SQLite for dev
 _db_url = os.environ.get('DATABASE_URL', 'sqlite:////tmp/equip_tracker.db')
-# Supabase/Heroku may return 'postgres://' — SQLAlchemy requires 'postgresql://'
+# Normalize hosted Postgres URLs for SQLAlchemy and pg8000.
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+if _db_url.startswith('postgresql://'):
+    _db_url = _db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
@@ -492,3 +494,4 @@ def delete_equip_type(type_id):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
