@@ -7,3 +7,5 @@ instance/
 .venv/
 venv/
 .vercel/
+
+.env*.local

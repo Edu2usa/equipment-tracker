@@ -7,9 +7,14 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Use DATABASE_URL in production. Local development may use SQLite, but Vercel
-# serverless instances do not share /tmp, so SQLite there loses and splits data.
-_raw_db_url = os.environ.get('DATABASE_URL')
+# Use a hosted Postgres URL in production. Local development may use SQLite,
+# but Vercel serverless instances do not share /tmp, so SQLite there splits data.
+_raw_db_url = (
+    os.environ.get('DATABASE_URL')
+    or os.environ.get('POSTGRES_URL')
+    or os.environ.get('POSTGRES_PRISMA_URL')
+    or os.environ.get('POSTGRES_URL_NON_POOLING')
+)
 _running_on_serverless = any(
     os.environ.get(key)
     for key in (
