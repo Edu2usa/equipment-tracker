@@ -95,16 +95,15 @@ with app.app_context():
         db.create_all()
         # Migration: add equip_id column if it doesn't exist
         with db.engine.connect() as conn:
-            try:
-                conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN equip_id VARCHAR(20)"))
-                conn.commit()
-            except Exception:
-                pass  # Column already exists
-            try:
-                conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN service_type VARCHAR(80)"))
-                conn.commit()
-            except Exception:
-                pass  # Column already exists
+            for statement in (
+                "ALTER TABLE equipment_items ADD COLUMN IF NOT EXISTS equip_id VARCHAR(20)",
+                "ALTER TABLE equipment_items ADD COLUMN IF NOT EXISTS service_type VARCHAR(80)",
+            ):
+                try:
+                    conn.execute(db.text(statement))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
         # Backfill equip_id for any existing rows that lack it
         items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
         for item in items_without_id:
