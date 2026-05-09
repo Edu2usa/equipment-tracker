@@ -10,6 +10,10 @@
 <div class="card form-card">
   <div class="transfer-info">
     <p><strong>Item:</strong> {{ item.name }}</p>
+    <p><strong>Model:</strong> {{ item.equipment_type }}</p>
+    {% if item.service_type %}
+    <p><strong>Service Type:</strong> {{ item.service_type }}</p>
+    {% endif %}
     <p><strong>Current Account:</strong> {{ item.account.name }} ({{ item.account.location }})</p>
     <p><strong>Quantity:</strong> {{ item.quantity }}</p>
   </div>

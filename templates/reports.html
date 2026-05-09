@@ -44,6 +44,8 @@
           <th>Account</th>
           <th>Location</th>
           <th>Type</th>
+          <th>Model</th>
+          <th>Service Type</th>
           <th>Total</th>
           <th>Working</th>
           <th>In Repair</th>
@@ -56,6 +58,8 @@
           <td class="bold">{{ row.account_name }}</td>
           <td>{{ row.location }}</td>
           <td><span class="badge badge-{{ row.account_type }}">{{ row.account_type.replace('_', ' ').title() }}</span></td>
+          <td>{{ row.equipment_type }}</td>
+          <td>{{ row.service_type or '-' }}</td>
           <td class="bold">{{ row.qty }}</td>
           <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
           <td>
@@ -94,6 +98,8 @@
       <thead>
         <tr>
           <th>Equipment Name</th>
+          <th>Model</th>
+          <th>Service Type</th>
           <th>Total Units</th>
           <th>Working</th>
           <th>In Repair</th>
@@ -105,6 +111,8 @@
         {% for row in name_summary %}
         <tr>
           <td class="bold">{{ row.name }}</td>
+          <td>{{ row.equipment_type }}</td>
+          <td>{{ row.service_type or '-' }}</td>
           <td class="bold">{{ row.total_qty }}</td>
           <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
           <td>

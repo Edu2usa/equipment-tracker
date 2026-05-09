@@ -22,7 +22,8 @@ class EquipmentItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     equip_id = db.Column(db.String(20), nullable=True, unique=True)  # e.g. EQ-0001
     name = db.Column(db.String(120), nullable=False)
-    equipment_type = db.Column(db.String(80), nullable=False)
+    equipment_type = db.Column(db.String(80), nullable=False)  # UI label: Equipment Model
+    service_type = db.Column(db.String(80), nullable=True)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
     item_status = db.Column(db.String(50), default='working')  # working, in_repair, in_storage
@@ -48,5 +49,11 @@ class EquipmentName(db.Model):
 
 class EquipmentType(db.Model):
     __tablename__ = 'equipment_types'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+
+
+class EquipmentServiceType(db.Model):
+    __tablename__ = 'equipment_service_types'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)

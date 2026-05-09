@@ -29,7 +29,7 @@
         <a href="{{ url_for('equipment') }}"   class="nav-link {% if request.endpoint in ['equipment','add_equipment','edit_equipment','delete_equipment','transfer_equipment'] %}active{% endif %}">Equipment</a>
         <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in request.endpoint %}active{% endif %}">Maintenance</a>
         <a href="{{ url_for('reports') }}"     class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
-        <a href="{{ url_for('settings') }}"    class="nav-link {% if 'settings' in request.endpoint or 'equip_name' in request.endpoint or 'equip_type' in request.endpoint %}active{% endif %}">Settings</a>
+        <a href="{{ url_for('settings') }}"    class="nav-link {% if 'settings' in request.endpoint or 'equip_name' in request.endpoint or 'equip_type' in request.endpoint or 'service_type' in request.endpoint %}active{% endif %}">Settings</a>
       </nav>
     </div>
   </header>

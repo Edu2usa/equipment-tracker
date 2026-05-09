@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Log Maintenance – Preferred Maintenance{% endblock %}
+{% block title %}Log Maintenance - Preferred Maintenance{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -13,9 +13,11 @@
       <div class="form-group">
         <label for="equipment_id">Equipment</label>
         <select id="equipment_id" name="equipment_id" class="form-control" required>
-          <option value="">— Select Equipment —</option>
+          <option value="">-- Select Equipment --</option>
           {% for eq in equipment_list %}
-          <option value="{{ eq.id }}">{{ eq.name }} – {{ eq.account.name }}</option>
+          <option value="{{ eq.id }}">
+            {{ eq.name }} / {{ eq.equipment_type }}{% if eq.service_type %} / {{ eq.service_type }}{% endif %} - {{ eq.account.name }}
+          </option>
           {% endfor %}
         </select>
       </div>

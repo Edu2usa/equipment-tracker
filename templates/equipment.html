@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Equipment – Preferred Maintenance{% endblock %}
+{% block title %}Equipment - Preferred Maintenance{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -7,15 +7,14 @@
   <a href="{{ url_for('add_equipment') }}" class="btn btn-primary">+ Add Equipment</a>
 </div>
 
-<!-- Filters -->
 <div class="card filter-card">
   <form method="GET" class="filter-form">
-    <input type="text" name="search" class="form-control" placeholder="Search equipment..."
+    <input type="text" name="search" class="form-control" placeholder="Search equipment, model, or service type..."
            value="{{ search }}" />
     <select name="status" class="form-control">
       <option value="">All Status</option>
-      <option value="working"    {% if status_filter == 'working'    %}selected{% endif %}>Working</option>
-      <option value="in_repair"  {% if status_filter == 'in_repair'  %}selected{% endif %}>In Repair</option>
+      <option value="working" {% if status_filter == 'working' %}selected{% endif %}>Working</option>
+      <option value="in_repair" {% if status_filter == 'in_repair' %}selected{% endif %}>In Repair</option>
       <option value="in_storage" {% if status_filter == 'in_storage' %}selected{% endif %}>In Storage</option>
     </select>
     <select name="account" class="form-control">
@@ -29,13 +28,13 @@
   </form>
 </div>
 
-<!-- Table -->
 <div class="card">
   <table class="data-table">
     <thead>
       <tr>
         <th>EQUIPMENT</th>
-        <th>TYPE</th>
+        <th>MODEL</th>
+        <th>SERVICE TYPE</th>
         <th>ACCOUNT</th>
         <th>QTY</th>
         <th>STATUS</th>
@@ -48,10 +47,11 @@
       <tr>
         <td class="bold">{{ item.name }}</td>
         <td>{{ item.equipment_type }}</td>
+        <td>{{ item.service_type or '-' }}</td>
         <td>{{ item.account.name }}</td>
         <td>{{ item.quantity }}</td>
         <td><span class="badge badge-{{ item.item_status }}">{{ item.item_status.replace('_', ' ').title() }}</span></td>
-        <td>{{ item.last_service_date.strftime('%b %d, %Y') if item.last_service_date else '—' }}</td>
+        <td>{{ item.last_service_date.strftime('%b %d, %Y') if item.last_service_date else '-' }}</td>
         <td class="actions-cell">
           <a href="{{ url_for('edit_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Edit</a>
           <a href="{{ url_for('transfer_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Transfer</a>
@@ -62,7 +62,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="empty-row">No equipment found. <a href="{{ url_for('add_equipment') }}">Add some.</a></td></tr>
+      <tr><td colspan="8" class="empty-row">No equipment found. <a href="{{ url_for('add_equipment') }}">Add some.</a></td></tr>
       {% endfor %}
     </tbody>
   </table>

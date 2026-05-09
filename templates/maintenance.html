@@ -23,6 +23,8 @@
     <thead>
       <tr>
         <th>EQUIPMENT</th>
+        <th>MODEL</th>
+        <th>SERVICE TYPE</th>
         <th>ACCOUNT</th>
         <th>TYPE</th>
         <th>DATE</th>
@@ -34,6 +36,8 @@
       {% for r in records %}
       <tr>
         <td class="bold">{{ r.equipment.name }}</td>
+        <td>{{ r.equipment.equipment_type }}</td>
+        <td>{{ r.equipment.service_type or '-' }}</td>
         <td>{{ r.equipment.account.name }}</td>
         <td>{{ r.maintenance_type }}</td>
         <td>{{ r.service_date.strftime('%b %d, %Y') }}</td>
@@ -46,7 +50,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="empty-row">No maintenance records yet. <a href="{{ url_for('add_maintenance') }}">Log one.</a></td></tr>
+      <tr><td colspan="8" class="empty-row">No maintenance records yet. <a href="{{ url_for('add_maintenance') }}">Log one.</a></td></tr>
       {% endfor %}
     </tbody>
   </table>

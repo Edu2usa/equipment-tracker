@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName, EquipmentType
+from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName, EquipmentType, EquipmentServiceType
 from datetime import datetime, date
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -77,9 +77,14 @@ DEFAULT_EQUIP_NAMES = [
     "Air Mover / Blower", "Mop & Bucket", "Cleaning Cart", "Squeegee Set", "Other",
 ]
 
-DEFAULT_EQUIP_TYPES = [
-    "Vacuum Equipment", "Floor Care", "Carpet Care", "Pressure Equipment",
-    "Air Movement", "Hand Tools & Accessories", "Carts & Transport", "Other",
+DEFAULT_EQUIP_MODELS = [
+    "Tennant", "Nobles", "ProTeam", "Hoover", "Sanitaire", "Nilfisk",
+    "Clarke", "Advance", "Karcher", "Other",
+]
+
+DEFAULT_SERVICE_TYPES = [
+    "General Service", "Batteries", "Hose", "Filter", "Brush", "Pad Driver",
+    "Squeegee", "Belt", "Motor", "Charger", "Other",
 ]
 
 with app.app_context():
@@ -95,19 +100,27 @@ with app.app_context():
                 conn.commit()
             except Exception:
                 pass  # Column already exists
+            try:
+                conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN service_type VARCHAR(80)"))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
         # Backfill equip_id for any existing rows that lack it
         items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
         for item in items_without_id:
             item.equip_id = f"EQ-{item.id:04d}"
         if items_without_id:
             db.session.commit()
-        # Seed equipment names and types if tables are empty
+        # Seed equipment names, models, and service types.
         if EquipmentName.query.count() == 0:
             for n in DEFAULT_EQUIP_NAMES:
                 db.session.add(EquipmentName(name=n))
-        if EquipmentType.query.count() == 0:
-            for t in DEFAULT_EQUIP_TYPES:
+        for t in DEFAULT_EQUIP_MODELS:
+            if not EquipmentType.query.filter_by(name=t).first():
                 db.session.add(EquipmentType(name=t))
+        for service_type in DEFAULT_SERVICE_TYPES:
+            if not EquipmentServiceType.query.filter_by(name=service_type).first():
+                db.session.add(EquipmentServiceType(name=service_type))
         db.session.commit()
 
 
@@ -135,6 +148,16 @@ def get_equip_names():
 
 def get_equip_types():
     return [r.name for r in EquipmentType.query.order_by(EquipmentType.name).all()]
+
+
+def get_service_types():
+    return [r.name for r in EquipmentServiceType.query.order_by(EquipmentServiceType.name).all()]
+
+
+def remember_option(model, value):
+    value = (value or "").strip()
+    if value and not model.query.filter_by(name=value).first():
+        db.session.add(model(name=value))
 
 
 # ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -250,7 +273,13 @@ def equipment():
 
     query = EquipmentItem.query
     if search:
-        query = query.filter(EquipmentItem.name.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                EquipmentItem.name.ilike(f'%{search}%'),
+                EquipmentItem.equipment_type.ilike(f'%{search}%'),
+                EquipmentItem.service_type.ilike(f'%{search}%'),
+            )
+        )
     if status_filter:
         query = query.filter_by(item_status=status_filter)
     if account_filter:
@@ -268,19 +297,21 @@ def add_equipment():
     accounts = Account.query.order_by(Account.name).all()
     equip_names = get_equip_names()
     equip_types = get_equip_types()
+    service_types = get_service_types()
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        equipment_type = request.form.get('equipment_type', '').strip()
+        name = (request.form.get('custom_name') or request.form.get('name') or '').strip()
+        equipment_type = (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip()
+        service_type = (request.form.get('custom_service_type') or request.form.get('service_type') or '').strip()
         account_id_raw = request.form.get('account_id', '').strip()
         quantity_raw = request.form.get('quantity', '1').strip()
         item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
 
         if not name or not equipment_type or not account_id_raw:
-            flash('Equipment name, type, and account are required.', 'error')
+            flash('Equipment name, model, and account are required.', 'error')
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         try:
             account_id = int(account_id_raw)
@@ -289,14 +320,14 @@ def add_equipment():
             flash('Invalid account or quantity value.', 'error')
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         if not Account.query.get(account_id):
             flash('Selected account no longer exists. Choose an account from the list.', 'error')
             accounts = Account.query.order_by(Account.name).all()
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         last_service = None
         if last_service_raw:
@@ -306,10 +337,13 @@ def add_equipment():
                 pass
 
         item = EquipmentItem(
-            name=name, equipment_type=equipment_type,
+            name=name, equipment_type=equipment_type, service_type=service_type,
             account_id=account_id, quantity=quantity,
             item_status=item_status, last_service_date=last_service
         )
+        remember_option(EquipmentName, name)
+        remember_option(EquipmentType, equipment_type)
+        remember_option(EquipmentServiceType, service_type)
         db.session.add(item)
         db.session.flush()
         item.equip_id = f"EQ-{item.id:04d}"
@@ -319,7 +353,7 @@ def add_equipment():
 
     return render_template('equipment_form.html', action='Add', item=None,
                            accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types)
+                           equip_types=equip_types, service_types=service_types)
 
 
 @app.route('/equipment/edit/<int:item_id>', methods=['GET', 'POST'])
@@ -331,19 +365,21 @@ def edit_equipment(item_id):
     accounts = Account.query.order_by(Account.name).all()
     equip_names = get_equip_names()
     equip_types = get_equip_types()
+    service_types = get_service_types()
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        equipment_type = request.form.get('equipment_type', '').strip()
+        name = (request.form.get('custom_name') or request.form.get('name') or '').strip()
+        equipment_type = (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip()
+        service_type = (request.form.get('custom_service_type') or request.form.get('service_type') or '').strip()
         account_id_raw = request.form.get('account_id', '').strip()
         quantity_raw = request.form.get('quantity', '1').strip()
         item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
 
         if not name or not equipment_type or not account_id_raw:
-            flash('Equipment name, type, and account are required.', 'error')
+            flash('Equipment name, model, and account are required.', 'error')
             return render_template('equipment_form.html', action='Edit', item=item,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         try:
             account_id = int(account_id_raw)
@@ -352,17 +388,18 @@ def edit_equipment(item_id):
             flash('Invalid account or quantity value.', 'error')
             return render_template('equipment_form.html', action='Edit', item=item,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         if not Account.query.get(account_id):
             flash('Selected account no longer exists. Choose an account from the list.', 'error')
             accounts = Account.query.order_by(Account.name).all()
             return render_template('equipment_form.html', action='Edit', item=item,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types)
+                                   equip_types=equip_types, service_types=service_types)
 
         item.name = name
         item.equipment_type = equipment_type
+        item.service_type = service_type
         item.account_id = account_id
         item.quantity = quantity
         item.item_status = item_status
@@ -372,13 +409,16 @@ def edit_equipment(item_id):
                 item.last_service_date = datetime.strptime(last_service_raw, '%Y-%m-%d').date()
             except ValueError:
                 pass
+        remember_option(EquipmentName, name)
+        remember_option(EquipmentType, equipment_type)
+        remember_option(EquipmentServiceType, service_type)
         db.session.commit()
         flash(f'Equipment "{item.name}" updated.', 'success')
         return redirect(url_for('equipment'))
 
     return render_template('equipment_form.html', action='Edit', item=item,
                            accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types)
+                           equip_types=equip_types, service_types=service_types)
 
 
 @app.route('/equipment/delete/<int:item_id>', methods=['POST'])
@@ -429,7 +469,13 @@ def maintenance():
         .join(EquipmentItem)
     )
     if search:
-        query = query.filter(EquipmentItem.name.ilike(f'%{search}%'))
+        query = query.filter(
+            db.or_(
+                EquipmentItem.name.ilike(f'%{search}%'),
+                EquipmentItem.equipment_type.ilike(f'%{search}%'),
+                EquipmentItem.service_type.ilike(f'%{search}%'),
+            )
+        )
     records = query.order_by(MaintenanceRecord.service_date.desc()).all()
     return render_template('maintenance.html', records=records, search=search)
 
@@ -511,6 +557,8 @@ def reports():
     name_summary = (
         db.session.query(
             EquipmentItem.name,
+            EquipmentItem.equipment_type,
+            EquipmentItem.service_type,
             func.sum(EquipmentItem.quantity).label('total_qty'),
             func.sum(
                 case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
@@ -522,8 +570,8 @@ def reports():
                 case((EquipmentItem.item_status == 'in_storage', EquipmentItem.quantity), else_=0)
             ).label('storage_qty'),
         )
-        .group_by(EquipmentItem.name)
-        .order_by(EquipmentItem.name)
+        .group_by(EquipmentItem.name, EquipmentItem.equipment_type, EquipmentItem.service_type)
+        .order_by(EquipmentItem.name, EquipmentItem.equipment_type, EquipmentItem.service_type)
         .all()
     )
 
@@ -536,6 +584,8 @@ def reports():
                 Account.name.label('account_name'),
                 Account.location,
                 Account.account_type,
+                EquipmentItem.equipment_type,
+                EquipmentItem.service_type,
                 func.sum(EquipmentItem.quantity).label('qty'),
                 func.sum(
                     case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
@@ -549,8 +599,8 @@ def reports():
             )
             .join(EquipmentItem, EquipmentItem.account_id == Account.id)
             .filter(EquipmentItem.name == selected_name)
-            .group_by(Account.id)
-            .order_by(Account.name)
+            .group_by(Account.id, EquipmentItem.equipment_type, EquipmentItem.service_type)
+            .order_by(Account.name, EquipmentItem.equipment_type, EquipmentItem.service_type)
             .all()
         )
         detail_total = sum(r.qty for r in detail_by_account)
@@ -569,7 +619,8 @@ def reports():
 def settings():
     names = EquipmentName.query.order_by(EquipmentName.name).all()
     types = EquipmentType.query.order_by(EquipmentType.name).all()
-    return render_template('settings.html', names=names, types=types)
+    service_types = EquipmentServiceType.query.order_by(EquipmentServiceType.name).all()
+    return render_template('settings.html', names=names, types=types, service_types=service_types)
 
 
 @app.route('/settings/names/add', methods=['POST'])
@@ -619,14 +670,14 @@ def delete_equip_name(name_id):
 def add_equip_type():
     name = request.form.get('name', '').strip()
     if not name:
-        flash('Type cannot be empty.', 'error')
+        flash('Model cannot be empty.', 'error')
         return redirect(url_for('settings'))
     if EquipmentType.query.filter_by(name=name).first():
         flash(f'"{name}" already exists.', 'error')
         return redirect(url_for('settings'))
     db.session.add(EquipmentType(name=name))
     db.session.commit()
-    flash(f'Equipment type "{name}" added.', 'success')
+    flash(f'Equipment model "{name}" added.', 'success')
     return redirect(url_for('settings'))
 
 
@@ -634,11 +685,11 @@ def add_equip_type():
 def edit_equip_type(type_id):
     rec = EquipmentType.query.get(type_id)
     if not rec:
-        flash('That equipment type was not found. It may have already been deleted.', 'warning')
+        flash('That equipment model was not found. It may have already been deleted.', 'warning')
         return redirect(url_for('settings'))
     new_name = request.form.get('name', '').strip()
     if not new_name:
-        flash('Type cannot be empty.', 'error')
+        flash('Model cannot be empty.', 'error')
         return redirect(url_for('settings'))
     rec.name = new_name
     db.session.commit()
@@ -650,11 +701,54 @@ def edit_equip_type(type_id):
 def delete_equip_type(type_id):
     rec = EquipmentType.query.get(type_id)
     if not rec:
-        flash('That equipment type was not found. It may have already been deleted.', 'warning')
+        flash('That equipment model was not found. It may have already been deleted.', 'warning')
         return redirect(url_for('settings'))
     db.session.delete(rec)
     db.session.commit()
-    flash(f'Equipment type "{rec.name}" deleted.', 'success')
+    flash(f'Equipment model "{rec.name}" deleted.', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/service-types/add', methods=['POST'])
+def add_service_type():
+    name = request.form.get('name', '').strip()
+    if not name:
+        flash('Service type cannot be empty.', 'error')
+        return redirect(url_for('settings'))
+    if EquipmentServiceType.query.filter_by(name=name).first():
+        flash(f'"{name}" already exists.', 'error')
+        return redirect(url_for('settings'))
+    db.session.add(EquipmentServiceType(name=name))
+    db.session.commit()
+    flash(f'Service type "{name}" added.', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/service-types/edit/<int:service_type_id>', methods=['POST'])
+def edit_service_type(service_type_id):
+    rec = EquipmentServiceType.query.get(service_type_id)
+    if not rec:
+        flash('That service type was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
+    new_name = request.form.get('name', '').strip()
+    if not new_name:
+        flash('Service type cannot be empty.', 'error')
+        return redirect(url_for('settings'))
+    rec.name = new_name
+    db.session.commit()
+    flash(f'Updated to "{new_name}".', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/service-types/delete/<int:service_type_id>', methods=['POST'])
+def delete_service_type(service_type_id):
+    rec = EquipmentServiceType.query.get(service_type_id)
+    if not rec:
+        flash('That service type was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
+    db.session.delete(rec)
+    db.session.commit()
+    flash(f'Service type "{rec.name}" deleted.', 'success')
     return redirect(url_for('settings'))
 
 
