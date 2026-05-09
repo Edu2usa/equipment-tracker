@@ -71,10 +71,11 @@ def require_persistent_database_in_production():
 # ── Default seed data ─────────────────────────────────────────────────────────
 
 DEFAULT_EQUIP_NAMES = [
-    "Backpack Vacuum", "Upright Vacuum", "Canister Vacuum", "Wet/Dry Vacuum",
-    "HEPA Vacuum", "Auto Scrubber – Walk-Behind", "Auto Scrubber – Ride-On",
-    "Floor Buffer / Burnisher", "Carpet Extractor", "Pressure Washer",
-    "Air Mover / Blower", "Mop & Bucket", "Cleaning Cart", "Squeegee Set", "Other",
+    "Canister Vacuum", "Backpack Vacuum - Cord", "Backpack Vacuum - Battery",
+    "Barrel Vacuum - Solo", "Barrel Vacuum - Double", "Barrel Vacuum - Cart",
+    "Narrow Buffer", "Wide Buffer", "Extractor", "Scrubber",
+    "Walk-Behind Scrubber", "Ride-On Scrubber", "Mop Bucket", "Maid Cart",
+    "Ladder", "Fan", "Other",
 ]
 
 DEFAULT_EQUIP_MODELS = [
@@ -111,8 +112,8 @@ with app.app_context():
         if items_without_id:
             db.session.commit()
         # Seed equipment names, models, and service types.
-        if EquipmentName.query.count() == 0:
-            for n in DEFAULT_EQUIP_NAMES:
+        for n in DEFAULT_EQUIP_NAMES:
+            if not EquipmentName.query.filter_by(name=n).first():
                 db.session.add(EquipmentName(name=n))
         for t in DEFAULT_EQUIP_MODELS:
             if not EquipmentType.query.filter_by(name=t).first():
