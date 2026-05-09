@@ -587,12 +587,15 @@ def delete_maintenance(record_id):
 @app.route('/reports')
 def reports():
     from sqlalchemy import func, case
+    report_view = request.args.get('view', 'equipment')
     selected_name = request.args.get('name', '')
+    selected_account_id = request.args.get('account', '')
 
     # All distinct equipment names that exist in the DB (for the dropdown)
     available_names = [
         r[0] for r in db.session.query(EquipmentItem.name).distinct().order_by(EquipmentItem.name).all()
     ]
+    available_accounts = Account.query.order_by(Account.name).all()
 
     # Full summary grouped by name (always shown)
     name_summary = (
@@ -646,12 +649,73 @@ def reports():
         )
         detail_total = sum(r.qty for r in detail_by_account)
 
+    account_inventory_query = (
+        db.session.query(
+            Account.id.label('account_id'),
+            Account.name.label('account_name'),
+            Account.location,
+            Account.account_type,
+            EquipmentItem.name.label('equipment_name'),
+            EquipmentItem.equipment_type,
+            EquipmentItem.service_type,
+            func.sum(EquipmentItem.quantity).label('qty'),
+            func.sum(
+                case((EquipmentItem.item_status == 'working', EquipmentItem.quantity), else_=0)
+            ).label('working_qty'),
+            func.sum(
+                case((EquipmentItem.item_status == 'in_repair', EquipmentItem.quantity), else_=0)
+            ).label('repair_qty'),
+            func.sum(
+                case((EquipmentItem.item_status == 'in_storage', EquipmentItem.quantity), else_=0)
+            ).label('storage_qty'),
+        )
+        .join(EquipmentItem, EquipmentItem.account_id == Account.id)
+    )
+    selected_account = None
+    if selected_account_id:
+        try:
+            selected_account_int = int(selected_account_id)
+        except ValueError:
+            selected_account_int = None
+        if selected_account_int:
+            selected_account = Account.query.get(selected_account_int)
+            account_inventory_query = account_inventory_query.filter(Account.id == selected_account_int)
+
+    account_inventory = (
+        account_inventory_query
+        .group_by(
+            Account.id,
+            EquipmentItem.name,
+            EquipmentItem.equipment_type,
+            EquipmentItem.service_type,
+        )
+        .order_by(
+            Account.name,
+            EquipmentItem.name,
+            EquipmentItem.equipment_type,
+            EquipmentItem.service_type,
+        )
+        .all()
+    )
+    account_totals = {
+        'qty': sum(row.qty or 0 for row in account_inventory),
+        'working': sum(row.working_qty or 0 for row in account_inventory),
+        'repair': sum(row.repair_qty or 0 for row in account_inventory),
+        'storage': sum(row.storage_qty or 0 for row in account_inventory),
+    }
+
     return render_template('reports.html',
+                           report_view=report_view,
                            available_names=available_names,
+                           available_accounts=available_accounts,
                            selected_name=selected_name,
+                           selected_account_id=selected_account_id,
+                           selected_account=selected_account,
                            name_summary=name_summary,
                            detail_by_account=detail_by_account,
-                           detail_total=detail_total)
+                           detail_total=detail_total,
+                           account_inventory=account_inventory,
+                           account_totals=account_totals)
 
 
 # ─── Settings: Equipment Names & Types ───────────────────────────────────────

@@ -1,17 +1,104 @@
 {% extends "base.html" %}
-{% block title %}Reports – Preferred Maintenance{% endblock %}
+{% block title %}Reports - Preferred Maintenance{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1>Reports</h1>
 </div>
 
-<!-- ── Equipment Picker ───────────────────────────────────────── -->
+<div class="report-tabs">
+  <a href="{{ url_for('reports') }}" class="btn {% if report_view != 'accounts' %}btn-primary{% else %}btn-outline{% endif %}">Equipment Summary</a>
+  <a href="{{ url_for('reports', view='accounts') }}" class="btn {% if report_view == 'accounts' %}btn-primary{% else %}btn-outline{% endif %}">Account Inventory</a>
+</div>
+
+{% if report_view == 'accounts' %}
+<div class="card mb-4">
+  <form method="get" action="{{ url_for('reports') }}" class="filter-bar">
+    <input type="hidden" name="view" value="accounts">
+    <label for="account-select" class="filter-label">View by Account:</label>
+    <select id="account-select" name="account" class="form-select" onchange="this.form.submit()">
+      <option value="">-- All Accounts --</option>
+      {% for account in available_accounts %}
+      <option value="{{ account.id }}" {% if selected_account_id == account.id|string %}selected{% endif %}>{{ account.name }}</option>
+      {% endfor %}
+    </select>
+    {% if selected_account_id %}
+    <a href="{{ url_for('reports', view='accounts') }}" class="btn btn-outline">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="report-section">
+  <div class="report-header">
+    <div>
+      <h2 class="report-title">{% if selected_account %}{{ selected_account.name }}{% else %}All Accounts{% endif %} - Inventory</h2>
+      <p class="report-subtitle">Equipment assigned by account, with totals at the bottom</p>
+    </div>
+    <div class="report-kpi">
+      <span class="kpi-value">{{ account_totals.qty }}</span>
+      <span class="kpi-label">Total Units</span>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    {% if account_inventory %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Equipment Name</th>
+          <th>Model</th>
+          <th>Service Type</th>
+          <th>Total</th>
+          <th>Working</th>
+          <th>In Repair</th>
+          <th>In Storage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in account_inventory %}
+        <tr>
+          <td class="bold">{{ row.account_name }}</td>
+          <td>{{ row.equipment_name }}</td>
+          <td>{{ row.equipment_type }}</td>
+          <td>{{ row.service_type or '-' }}</td>
+          <td class="bold">{{ row.qty }}</td>
+          <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
+          <td>
+            {% if row.repair_qty > 0 %}
+            <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
+          </td>
+          <td>
+            {% if row.storage_qty > 0 %}
+            <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" class="bold">Totals</td>
+          <td class="bold">{{ account_totals.qty }}</td>
+          <td><span class="badge badge-working">{{ account_totals.working }}</span></td>
+          <td><span class="badge badge-in_repair">{{ account_totals.repair }}</span></td>
+          <td><span class="badge badge-in_storage">{{ account_totals.storage }}</span></td>
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <p class="empty-row">No equipment found for this account view. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
 <div class="card mb-4">
   <form method="get" action="{{ url_for('reports') }}" class="filter-bar">
     <label for="name-select" class="filter-label">View by Equipment:</label>
     <select id="name-select" name="name" class="form-select" onchange="this.form.submit()">
-      <option value="">— All Equipment Summary —</option>
+      <option value="">-- All Equipment Summary --</option>
       {% for n in available_names %}
       <option value="{{ n }}" {% if n == selected_name %}selected{% endif %}>{{ n }}</option>
       {% endfor %}
@@ -23,11 +110,10 @@
 </div>
 
 {% if selected_name %}
-<!-- ── Per-Equipment Account Breakdown ───────────────────────── -->
 <div class="report-section">
   <div class="report-header">
     <div>
-      <h2 class="report-title">{{ selected_name }} – By Account</h2>
+      <h2 class="report-title">{{ selected_name }} - By Account</h2>
       <p class="report-subtitle">Distribution across all accounts</p>
     </div>
     <div class="report-kpi">
@@ -65,12 +151,12 @@
           <td>
             {% if row.repair_qty > 0 %}
             <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
           </td>
           <td>
             {% if row.storage_qty > 0 %}
             <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -83,12 +169,11 @@
 </div>
 
 {% else %}
-<!-- ── Full Equipment Summary ─────────────────────────────────── -->
 <div class="report-section">
   <div class="report-header">
     <div>
       <h2 class="report-title">Full Equipment Summary</h2>
-      <p class="report-subtitle">All equipment grouped by name — select a name above to drill down by account</p>
+      <p class="report-subtitle">All equipment grouped by name - select a name above to drill down by account</p>
     </div>
   </div>
 
@@ -118,12 +203,12 @@
           <td>
             {% if row.repair_qty > 0 %}
             <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
           </td>
           <td>
             {% if row.storage_qty > 0 %}
             <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">—</span>{% endif %}
+            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
           </td>
           <td>
             <a href="{{ url_for('reports', name=row.name) }}" class="btn btn-sm btn-outline">By Account</a>
@@ -137,6 +222,7 @@
     {% endif %}
   </div>
 </div>
+{% endif %}
 {% endif %}
 
 {% endblock %}
