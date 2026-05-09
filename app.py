@@ -207,6 +207,13 @@ def add_equipment():
                                    accounts=accounts, equip_names=equip_names,
                                    equip_types=equip_types)
 
+        if not Account.query.get(account_id):
+            flash('Selected account no longer exists. Choose an account from the list.', 'error')
+            accounts = Account.query.order_by(Account.name).all()
+            return render_template('equipment_form.html', action='Add', item=None,
+                                   accounts=accounts, equip_names=equip_names,
+                                   equip_types=equip_types)
+
         last_service = None
         if last_service_raw:
             try:
@@ -233,7 +240,10 @@ def add_equipment():
 
 @app.route('/equipment/edit/<int:item_id>', methods=['GET', 'POST'])
 def edit_equipment(item_id):
-    item = EquipmentItem.query.get_or_404(item_id)
+    item = EquipmentItem.query.get(item_id)
+    if not item:
+        flash('That equipment item no longer exists. Choose an item from the list below.', 'warning')
+        return redirect(url_for('equipment'))
     accounts = Account.query.order_by(Account.name).all()
     equip_names = get_equip_names()
     equip_types = get_equip_types()
@@ -260,6 +270,13 @@ def edit_equipment(item_id):
                                    accounts=accounts, equip_names=equip_names,
                                    equip_types=equip_types)
 
+        if not Account.query.get(account_id):
+            flash('Selected account no longer exists. Choose an account from the list.', 'error')
+            accounts = Account.query.order_by(Account.name).all()
+            return render_template('equipment_form.html', action='Edit', item=item,
+                                   accounts=accounts, equip_names=equip_names,
+                                   equip_types=equip_types)
+
         item.name = name
         item.equipment_type = equipment_type
         item.account_id = account_id
@@ -282,7 +299,10 @@ def edit_equipment(item_id):
 
 @app.route('/equipment/delete/<int:item_id>', methods=['POST'])
 def delete_equipment(item_id):
-    item = EquipmentItem.query.get_or_404(item_id)
+    item = EquipmentItem.query.get(item_id)
+    if not item:
+        flash('That equipment item was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('equipment'))
     db.session.delete(item)
     db.session.commit()
     flash('Equipment deleted.', 'success')
@@ -291,10 +311,22 @@ def delete_equipment(item_id):
 
 @app.route('/equipment/transfer/<int:item_id>', methods=['GET', 'POST'])
 def transfer_equipment(item_id):
-    item = EquipmentItem.query.get_or_404(item_id)
+    item = EquipmentItem.query.get(item_id)
+    if not item:
+        flash('That equipment item no longer exists. Choose an item from the list below.', 'warning')
+        return redirect(url_for('equipment'))
     accounts = Account.query.order_by(Account.name).all()
     if request.method == 'POST':
-        new_account_id = int(request.form['account_id'])
+        try:
+            new_account_id = int(request.form.get('account_id', ''))
+        except ValueError:
+            flash('Choose a destination account.', 'error')
+            return render_template('transfer_form.html', item=item, accounts=accounts)
+        destination = Account.query.get(new_account_id)
+        if not destination:
+            flash('Destination account no longer exists. Choose another account.', 'error')
+            accounts = Account.query.order_by(Account.name).all()
+            return render_template('transfer_form.html', item=item, accounts=accounts)
         old_account = item.account.name
         item.account_id = new_account_id
         db.session.commit()
@@ -322,12 +354,31 @@ def maintenance():
 def add_maintenance():
     equipment_list = EquipmentItem.query.order_by(EquipmentItem.name).all()
     if request.method == 'POST':
-        equipment_id = int(request.form['equipment_id'])
-        maintenance_type = request.form['maintenance_type'].strip()
+        try:
+            equipment_id = int(request.form.get('equipment_id', ''))
+        except ValueError:
+            flash('Choose equipment before saving a maintenance record.', 'error')
+            return render_template('maintenance_form.html', equipment_list=equipment_list,
+                                   today=date.today().isoformat())
+
+        equipment = EquipmentItem.query.get(equipment_id)
+        if not equipment:
+            flash('Selected equipment no longer exists. Choose an item from the list.', 'error')
+            equipment_list = EquipmentItem.query.order_by(EquipmentItem.name).all()
+            return render_template('maintenance_form.html', equipment_list=equipment_list,
+                                   today=date.today().isoformat())
+
+        maintenance_type = request.form.get('maintenance_type', '').strip()
         service_date_raw = request.form['service_date'].strip()
         notes = request.form.get('notes', '').strip()
 
-        service_date = datetime.strptime(service_date_raw, '%Y-%m-%d').date()
+        try:
+            service_date = datetime.strptime(service_date_raw, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Enter a valid service date.', 'error')
+            return render_template('maintenance_form.html', equipment_list=equipment_list,
+                                   today=date.today().isoformat())
+
         record = MaintenanceRecord(
             equipment_id=equipment_id,
             maintenance_type=maintenance_type,
@@ -336,11 +387,10 @@ def add_maintenance():
         )
         db.session.add(record)
 
-        equip = EquipmentItem.query.get(equipment_id)
-        if equip and (equip.last_service_date is None or service_date > equip.last_service_date):
-            equip.last_service_date = service_date
+        if equipment.last_service_date is None or service_date > equipment.last_service_date:
+            equipment.last_service_date = service_date
             if request.form.get('mark_working') == 'yes':
-                equip.item_status = 'working'
+                equipment.item_status = 'working'
 
         db.session.commit()
         flash('Maintenance record logged.', 'success')
@@ -351,7 +401,10 @@ def add_maintenance():
 
 @app.route('/maintenance/delete/<int:record_id>', methods=['POST'])
 def delete_maintenance(record_id):
-    record = MaintenanceRecord.query.get_or_404(record_id)
+    record = MaintenanceRecord.query.get(record_id)
+    if not record:
+        flash('That maintenance record was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('maintenance'))
     db.session.delete(record)
     db.session.commit()
     flash('Maintenance record deleted.', 'success')
@@ -452,7 +505,10 @@ def add_equip_name():
 
 @app.route('/settings/names/edit/<int:name_id>', methods=['POST'])
 def edit_equip_name(name_id):
-    rec = EquipmentName.query.get_or_404(name_id)
+    rec = EquipmentName.query.get(name_id)
+    if not rec:
+        flash('That equipment name was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
     new_name = request.form.get('name', '').strip()
     if not new_name:
         flash('Name cannot be empty.', 'error')
@@ -465,7 +521,10 @@ def edit_equip_name(name_id):
 
 @app.route('/settings/names/delete/<int:name_id>', methods=['POST'])
 def delete_equip_name(name_id):
-    rec = EquipmentName.query.get_or_404(name_id)
+    rec = EquipmentName.query.get(name_id)
+    if not rec:
+        flash('That equipment name was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
     db.session.delete(rec)
     db.session.commit()
     flash(f'Equipment name "{rec.name}" deleted.', 'success')
@@ -489,7 +548,10 @@ def add_equip_type():
 
 @app.route('/settings/types/edit/<int:type_id>', methods=['POST'])
 def edit_equip_type(type_id):
-    rec = EquipmentType.query.get_or_404(type_id)
+    rec = EquipmentType.query.get(type_id)
+    if not rec:
+        flash('That equipment type was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
     new_name = request.form.get('name', '').strip()
     if not new_name:
         flash('Type cannot be empty.', 'error')
@@ -502,7 +564,10 @@ def edit_equip_type(type_id):
 
 @app.route('/settings/types/delete/<int:type_id>', methods=['POST'])
 def delete_equip_type(type_id):
-    rec = EquipmentType.query.get_or_404(type_id)
+    rec = EquipmentType.query.get(type_id)
+    if not rec:
+        flash('That equipment type was not found. It may have already been deleted.', 'warning')
+        return redirect(url_for('settings'))
     db.session.delete(rec)
     db.session.commit()
     flash(f'Equipment type "{rec.name}" deleted.', 'success')
