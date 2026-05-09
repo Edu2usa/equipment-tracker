@@ -10,9 +10,23 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Use DATABASE_URL in production. Local development may use SQLite, but Vercel
 # serverless instances do not share /tmp, so SQLite there loses and splits data.
 _raw_db_url = os.environ.get('DATABASE_URL')
-_running_on_vercel = os.environ.get('VERCEL') == '1' or bool(os.environ.get('VERCEL_REGION'))
-PERSISTENT_DATABASE_CONFIGURED = bool(_raw_db_url) or not _running_on_vercel
-_db_url = _raw_db_url or 'sqlite:///equip_tracker.db'
+_running_on_serverless = any(
+    os.environ.get(key)
+    for key in (
+        'VERCEL',
+        'VERCEL_ENV',
+        'VERCEL_URL',
+        'VERCEL_REGION',
+        'NOW_REGION',
+        'AWS_REGION',
+        'AWS_EXECUTION_ENV',
+        'AWS_LAMBDA_FUNCTION_NAME',
+        'LAMBDA_TASK_ROOT',
+    )
+)
+_allow_sqlite_in_serverless = os.environ.get('ALLOW_SQLITE_IN_SERVERLESS') == '1'
+PERSISTENT_DATABASE_CONFIGURED = bool(_raw_db_url) or not _running_on_serverless or _allow_sqlite_in_serverless
+_db_url = _raw_db_url or ('sqlite:////tmp/equip_tracker.db' if _running_on_serverless else 'sqlite:///equip_tracker.db')
 # Normalize hosted Postgres URLs for SQLAlchemy and pg8000.
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
