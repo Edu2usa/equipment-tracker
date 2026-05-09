@@ -663,6 +663,49 @@ textarea.form-control { resize: vertical; }
   margin-bottom: 16px;
 }
 
+.matrix-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.matrix-table {
+  min-width: 900px;
+}
+
+.matrix-table thead th {
+  text-align: center;
+  vertical-align: bottom;
+  white-space: normal;
+  min-width: 82px;
+}
+
+.matrix-table thead th:first-child,
+.matrix-table tbody td:first-child,
+.matrix-table tfoot td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.matrix-table thead th:first-child {
+  background: var(--charcoal);
+  text-align: left;
+}
+
+.matrix-table tbody td:first-child,
+.matrix-table tfoot td:first-child {
+  background: var(--surface);
+}
+
+.matrix-table tfoot td:first-child {
+  background: var(--gray-50);
+}
+
+.matrix-number {
+  text-align: center;
+  color: var(--charcoal);
+}
+
 .report-section {
   margin-bottom: 40px;
 }

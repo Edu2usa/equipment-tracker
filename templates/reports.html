@@ -32,7 +32,7 @@
   <div class="report-header">
     <div>
       <h2 class="report-title">{% if selected_account %}{{ selected_account.name }}{% else %}All Accounts{% endif %} - Inventory</h2>
-      <p class="report-subtitle">Equipment assigned by account, with totals at the bottom</p>
+      <p class="report-subtitle">Accounts as rows, equipment as columns, with totals at the bottom</p>
     </div>
     <div class="report-kpi">
       <span class="kpi-value">{{ account_totals.qty }}</span>
@@ -41,52 +41,41 @@
   </div>
 
   <div class="card mt-4">
-    {% if account_inventory %}
-    <table class="data-table">
+    {% if account_matrix_rows %}
+    <div class="matrix-scroll">
+    <table class="data-table matrix-table">
       <thead>
         <tr>
           <th>Account</th>
-          <th>Equipment Name</th>
-          <th>Model</th>
-          <th>Service Type</th>
+          {% for column in account_matrix_columns %}
+          <th>{{ column }}</th>
+          {% endfor %}
           <th>Total</th>
-          <th>Working</th>
-          <th>In Repair</th>
-          <th>In Storage</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in account_inventory %}
+        {% for row in account_matrix_rows %}
         <tr>
           <td class="bold">{{ row.account_name }}</td>
-          <td>{{ row.equipment_name }}</td>
-          <td>{{ row.equipment_type }}</td>
-          <td>{{ row.service_type or '-' }}</td>
-          <td class="bold">{{ row.qty }}</td>
-          <td><span class="badge badge-working">{{ row.working_qty }}</span></td>
-          <td>
-            {% if row.repair_qty > 0 %}
-            <span class="badge badge-in_repair">{{ row.repair_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
-          </td>
-          <td>
-            {% if row.storage_qty > 0 %}
-            <span class="badge badge-in_storage">{{ row.storage_qty }}</span>
-            {% else %}<span style="color:var(--gray-400)">-</span>{% endif %}
-          </td>
+          {% for column in account_matrix_columns %}
+          {% set qty = row.cells.get(column, 0) %}
+          <td class="matrix-number">{% if qty %}{{ qty }}{% endif %}</td>
+          {% endfor %}
+          <td class="bold matrix-number">{{ row.total }}</td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="4" class="bold">Totals</td>
-          <td class="bold">{{ account_totals.qty }}</td>
-          <td><span class="badge badge-working">{{ account_totals.working }}</span></td>
-          <td><span class="badge badge-in_repair">{{ account_totals.repair }}</span></td>
-          <td><span class="badge badge-in_storage">{{ account_totals.storage }}</span></td>
+          <td class="bold">Totals</td>
+          {% for column in account_matrix_columns %}
+          <td class="bold matrix-number">{{ account_matrix_totals.get(column, 0) }}</td>
+          {% endfor %}
+          <td class="bold matrix-number">{{ account_matrix_grand_total }}</td>
         </tr>
       </tfoot>
     </table>
+    </div>
     {% else %}
     <p class="empty-row">No equipment found for this account view. <a href="{{ url_for('add_equipment') }}">Add equipment</a>.</p>
     {% endif %}

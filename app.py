@@ -703,6 +703,38 @@ def reports():
         'repair': sum(row.repair_qty or 0 for row in account_inventory),
         'storage': sum(row.storage_qty or 0 for row in account_inventory),
     }
+    account_matrix_columns = []
+    account_matrix_rows = []
+    account_matrix_totals = {}
+    account_matrix_grand_total = 0
+    if account_inventory:
+        column_labels = []
+        column_keys = set()
+        row_map = {}
+        for row in account_inventory:
+            column_label = row.equipment_name
+            if row.equipment_type:
+                column_label = f"{column_label} / {row.equipment_type}"
+            if row.service_type:
+                column_label = f"{column_label} / {row.service_type}"
+            if column_label not in column_keys:
+                column_keys.add(column_label)
+                column_labels.append(column_label)
+            account_row = row_map.setdefault(
+                row.account_id,
+                {
+                    'account_name': row.account_name,
+                    'cells': {},
+                    'total': 0,
+                },
+            )
+            qty = row.qty or 0
+            account_row['cells'][column_label] = account_row['cells'].get(column_label, 0) + qty
+            account_row['total'] += qty
+            account_matrix_totals[column_label] = account_matrix_totals.get(column_label, 0) + qty
+            account_matrix_grand_total += qty
+        account_matrix_columns = sorted(column_labels)
+        account_matrix_rows = list(row_map.values())
 
     return render_template('reports.html',
                            report_view=report_view,
@@ -715,7 +747,11 @@ def reports():
                            detail_by_account=detail_by_account,
                            detail_total=detail_total,
                            account_inventory=account_inventory,
-                           account_totals=account_totals)
+                           account_totals=account_totals,
+                           account_matrix_columns=account_matrix_columns,
+                           account_matrix_rows=account_matrix_rows,
+                           account_matrix_totals=account_matrix_totals,
+                           account_matrix_grand_total=account_matrix_grand_total)
 
 
 # ─── Settings: Equipment Names & Types ───────────────────────────────────────
