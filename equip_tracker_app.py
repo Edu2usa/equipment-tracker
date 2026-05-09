@@ -627,8 +627,12 @@ def add_account():
     return render(T_ACCOUNT_FORM, action='Add', account=None)
 
 @app.route('/accounts/edit/<int:account_id>', methods=['GET', 'POST'])
+@app.route('/accounts/<int:account_id>/edit', methods=['GET', 'POST'])
 def edit_account(account_id):
-    acct = Account.query.get_or_404(account_id)
+    acct = Account.query.get(account_id)
+    if not acct:
+        flash('That account no longer exists. It may have already been deleted.', 'error')
+        return redirect(url_for('accounts'))
     if request.method == 'POST':
         acct.name         = request.form['name'].strip()
         acct.account_type = request.form['account_type']
@@ -638,9 +642,16 @@ def edit_account(account_id):
         return redirect(url_for('accounts'))
     return render(T_ACCOUNT_FORM, action='Edit', account=acct)
 
-@app.route('/accounts/delete/<int:account_id>', methods=['POST'])
+@app.route('/accounts/delete/<int:account_id>', methods=['GET', 'POST'])
+@app.route('/accounts/<int:account_id>/delete', methods=['GET', 'POST'])
 def delete_account(account_id):
-    acct = Account.query.get_or_404(account_id)
+    acct = Account.query.get(account_id)
+    if not acct:
+        flash('That account was not found. It may have already been deleted.', 'error')
+        return redirect(url_for('accounts'))
+    if request.method == 'GET':
+        flash('Use the Delete button on an account row to confirm deletion.', 'error')
+        return redirect(url_for('accounts'))
     if acct.equipment_items:
         flash('Cannot delete account with equipment assigned.', 'error')
     else:
