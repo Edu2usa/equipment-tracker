@@ -18,7 +18,7 @@
     <div class="form-group">
       <label for="account_type">Type</label>
       <select id="account_type" name="account_type" class="form-control">
-        {% for val, label in [('client','Client'), ('warehouse','Warehouse'), ('spare_pool','Spare Pool')] %}
+        {% for val, label in [('client','Customer'), ('warehouse','Warehouse'), ('spare_pool','Special / Spare Pool')] %}
         <option value="{{ val }}" {% if account and account.account_type == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
@@ -27,7 +27,7 @@
     <div class="form-group">
       <label for="location">Location</label>
       <input type="text" id="location" name="location" class="form-control"
-             value="{{ account.location if account else '' }}" placeholder="e.g. New York" required />
+             value="{{ account.location if account else '' }}" placeholder="Optional" />
     </div>
 
     <div class="form-actions">

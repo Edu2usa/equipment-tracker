@@ -22,8 +22,8 @@
       {% for acct in accounts %}
       <tr>
         <td class="bold">{{ acct.name }}</td>
-        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type }}</span></td>
-        <td>{{ acct.location }}</td>
+        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type.replace('_', ' ').title() }}</span></td>
+        <td>{{ acct.location or '-' }}</td>
         <td>{{ acct.equipment_count() }}</td>
         <td class="actions-cell">
           <a href="{{ url_for('edit_account', account_id=acct.id) }}" class="btn btn-sm btn-outline">Edit</a>

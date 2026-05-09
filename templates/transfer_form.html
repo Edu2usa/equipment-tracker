@@ -14,7 +14,7 @@
     {% if item.service_type %}
     <p><strong>Service Type:</strong> {{ item.service_type }}</p>
     {% endif %}
-    <p><strong>Current Account:</strong> {{ item.account.name }} ({{ item.account.location }})</p>
+    <p><strong>Current Account:</strong> {{ item.account.name }}{% if item.account.location %} ({{ item.account.location }}){% endif %}</p>
     <p><strong>Quantity:</strong> {{ item.quantity }}</p>
   </div>
 
@@ -25,7 +25,7 @@
         <option value="">— Select Destination Account —</option>
         {% for acct in accounts %}
         {% if acct.id != item.account_id %}
-        <option value="{{ acct.id }}">{{ acct.name }} – {{ acct.location }} ({{ acct.account_type }})</option>
+        <option value="{{ acct.id }}">{{ acct.name }}{% if acct.location %} - {{ acct.location }}{% endif %} ({{ acct.account_type.replace('_', ' ').title() }})</option>
         {% endif %}
         {% endfor %}
       </select>

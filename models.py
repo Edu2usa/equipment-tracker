@@ -9,7 +9,7 @@ class Account(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     account_type = db.Column(db.String(50), nullable=False)  # client, warehouse, spare_pool
-    location = db.Column(db.String(120), nullable=False)
+    location = db.Column(db.String(120), nullable=False, default='')
     equipment_items = db.relationship('EquipmentItem', backref='account', lazy=True,
                                       foreign_keys='EquipmentItem.account_id')
 

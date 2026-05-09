@@ -56,7 +56,7 @@
         {% for row in detail_by_account %}
         <tr>
           <td class="bold">{{ row.account_name }}</td>
-          <td>{{ row.location }}</td>
+          <td>{{ row.location or '-' }}</td>
           <td><span class="badge badge-{{ row.account_type }}">{{ row.account_type.replace('_', ' ').title() }}</span></td>
           <td>{{ row.equipment_type }}</td>
           <td>{{ row.service_type or '-' }}</td>

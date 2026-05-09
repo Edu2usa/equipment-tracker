@@ -72,7 +72,7 @@
           <option value="">-- Select Account --</option>
           {% for acct in accounts %}
           <option value="{{ acct.id }}" {% if item and item.account_id == acct.id %}selected{% endif %}>
-            {{ acct.name }} ({{ acct.location }})
+            {{ acct.name }}{% if acct.location %} ({{ acct.location }}){% endif %}
           </option>
           {% endfor %}
         </select>

@@ -81,8 +81,8 @@
       {% for acct in accounts %}
       <tr>
         <td class="bold">{{ acct.name }}</td>
-        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type }}</span></td>
-        <td>{{ acct.location }}</td>
+        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type.replace('_', ' ').title() }}</span></td>
+        <td>{{ acct.location or '-' }}</td>
         <td>{{ acct.equipment_count() }}</td>
       </tr>
       {% else %}

@@ -88,6 +88,60 @@ DEFAULT_SERVICE_TYPES = [
     "Squeegee", "Belt", "Motor", "Charger", "Other",
 ]
 
+DEFAULT_ACCOUNTS = [
+    ("100 MILL PLAIN", "client"),
+    ("170 / 164", "client"),
+    ("20 GERMANTOWN", "client"),
+    ("235 Main", "client"),
+    ("33 GERMANTOWN", "client"),
+    ("79 SAND PIT", "client"),
+    ("ANN'S PLACE", "client"),
+    ("BELIMO", "client"),
+    ("BRANSON", "client"),
+    ("BRIDPORT SURGICAL", "client"),
+    ("CCATS", "client"),
+    ("COMM CTR", "client"),
+    ("DAVITTA", "client"),
+    ("DERM ASSOC", "client"),
+    ("DHMAC", "client"),
+    ("DR. CIGNO", "client"),
+    ("ENTEGRIS", "client"),
+    ("ETHAN ALLEN", "client"),
+    ("GL RIDGEFIELD", "client"),
+    ("GOLD GARAGE", "client"),
+    ("IMMACULATE", "client"),
+    ("MANNKIND", "client"),
+    ("MAPLEWOOD", "client"),
+    ("MITCHELL WDBRY", "client"),
+    ("MOTION PT", "client"),
+    ("NEWT REHAB", "client"),
+    ("NORTHEAST", "client"),
+    ("RIDGEFIELD DIAGNOSTIC", "client"),
+    ("RESONETICS", "client"),
+    ("SHERMAN SCHOOL", "client"),
+    ("SOMERS", "client"),
+    ("UROLOGY ASSOC", "client"),
+    ("VNA", "client"),
+    ("WILTON SURG", "client"),
+    ("Special", "spare_pool"),
+]
+
+
+def normalized_text(value):
+    return " ".join((value or "").strip().casefold().split())
+
+
+def find_duplicate_account(name, exclude_id=None):
+    normalized_name = normalized_text(name)
+    query = Account.query
+    if exclude_id is not None:
+        query = query.filter(Account.id != exclude_id)
+    for account in query.all():
+        if normalized_text(account.name) == normalized_name:
+            return account
+    return None
+
+
 with app.app_context():
     if not PERSISTENT_DATABASE_CONFIGURED:
         # Do not create a misleading per-instance SQLite database in production.
@@ -121,27 +175,14 @@ with app.app_context():
         for service_type in DEFAULT_SERVICE_TYPES:
             if not EquipmentServiceType.query.filter_by(name=service_type).first():
                 db.session.add(EquipmentServiceType(name=service_type))
+        for account_name, account_type in DEFAULT_ACCOUNTS:
+            existing_account = find_duplicate_account(account_name)
+            if existing_account:
+                existing_account.name = account_name
+                existing_account.account_type = account_type
+            else:
+                db.session.add(Account(name=account_name, account_type=account_type, location=''))
         db.session.commit()
-
-
-def normalized_text(value):
-    return " ".join((value or "").strip().casefold().split())
-
-
-def find_duplicate_account(name, location, exclude_id=None):
-    normalized_name = normalized_text(name)
-    normalized_location = normalized_text(location)
-    query = Account.query
-    if exclude_id is not None:
-        query = query.filter(Account.id != exclude_id)
-    for account in query.all():
-        if (
-            normalized_text(account.name) == normalized_name
-            and normalized_text(account.location) == normalized_location
-        ):
-            return account
-    return None
-
 
 def get_equip_names():
     return [r.name for r in EquipmentName.query.order_by(EquipmentName.name).all()]
@@ -199,12 +240,12 @@ def add_account():
         name = request.form['name'].strip()
         account_type = request.form['account_type']
         location = request.form['location'].strip()
-        if not name or not location:
-            flash('Name and location are required.', 'error')
+        if not name:
+            flash('Account name is required.', 'error')
             return render_template('account_form.html', action='Add', account=None)
-        duplicate = find_duplicate_account(name, location)
+        duplicate = find_duplicate_account(name)
         if duplicate:
-            flash(f'Account "{duplicate.name}" at {duplicate.location} already exists. Use Edit instead of adding a duplicate.', 'warning')
+            flash(f'Account "{duplicate.name}" already exists. Use Edit instead of adding a duplicate.', 'warning')
             return redirect(url_for('accounts'))
         acct = Account(name=name, account_type=account_type, location=location)
         db.session.add(acct)
@@ -228,12 +269,12 @@ def edit_account(account_id):
         acct.name = request.form['name'].strip()
         acct.account_type = request.form['account_type']
         acct.location = request.form['location'].strip()
-        if not acct.name or not acct.location:
-            flash('Name and location are required.', 'error')
+        if not acct.name:
+            flash('Account name is required.', 'error')
             return render_template('account_form.html', action='Edit', account=acct)
-        duplicate = find_duplicate_account(acct.name, acct.location, exclude_id=acct.id)
+        duplicate = find_duplicate_account(acct.name, exclude_id=acct.id)
         if duplicate:
-            flash(f'Account "{duplicate.name}" at {duplicate.location} already exists. Merge or edit the existing account instead.', 'warning')
+            flash(f'Account "{duplicate.name}" already exists. Merge or edit the existing account instead.', 'warning')
             return redirect(url_for('accounts'))
         db.session.commit()
         flash(f'Account "{acct.name}" updated.', 'success')
