@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Database Required - Equipment Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <main class="page-content">
+    <section class="card setup-card">
+      <p class="eyebrow">Production setup required</p>
+      <h1>Connect a shared database before using Equipment Tracker</h1>
+      <p>
+        This Vercel deployment is missing <code>DATABASE_URL</code>. Without it, data is stored in temporary
+        serverless files, so accounts can duplicate or disappear between pages.
+      </p>
+      <div class="setup-steps">
+        <h2>Fix</h2>
+        <ol>
+          <li>Create or choose a hosted PostgreSQL database.</li>
+          <li>Add its connection string as <code>DATABASE_URL</code> in the Vercel project environment variables.</li>
+          <li>Redeploy this project.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

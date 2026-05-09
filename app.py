@@ -7,8 +7,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Use DATABASE_URL env var (Supabase PostgreSQL) if set, else local SQLite for dev
-_db_url = os.environ.get('DATABASE_URL', 'sqlite:////tmp/equip_tracker.db')
+# Use DATABASE_URL in production. Local development may use SQLite, but Vercel
+# serverless instances do not share /tmp, so SQLite there loses and splits data.
+_raw_db_url = os.environ.get('DATABASE_URL')
+_running_on_vercel = os.environ.get('VERCEL') == '1' or bool(os.environ.get('VERCEL_REGION'))
+PERSISTENT_DATABASE_CONFIGURED = bool(_raw_db_url) or not _running_on_vercel
+_db_url = _raw_db_url or 'sqlite:///equip_tracker.db'
 # Normalize hosted Postgres URLs for SQLAlchemy and pg8000.
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
@@ -17,6 +21,13 @@ if _db_url.startswith('postgresql://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
+
+
+@app.before_request
+def require_persistent_database_in_production():
+    if PERSISTENT_DATABASE_CONFIGURED or request.endpoint == 'static':
+        return None
+    return render_template('database_required.html'), 503
 
 # ── Default seed data ─────────────────────────────────────────────────────────
 
@@ -33,28 +44,51 @@ DEFAULT_EQUIP_TYPES = [
 ]
 
 with app.app_context():
-    db.create_all()
-    # Migration: add equip_id column if it doesn't exist
-    with db.engine.connect() as conn:
-        try:
-            conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN equip_id VARCHAR(20)"))
-            conn.commit()
-        except Exception:
-            pass  # Column already exists
-    # Backfill equip_id for any existing rows that lack it
-    items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
-    for item in items_without_id:
-        item.equip_id = f"EQ-{item.id:04d}"
-    if items_without_id:
+    if not PERSISTENT_DATABASE_CONFIGURED:
+        # Do not create a misleading per-instance SQLite database in production.
+        pass
+    else:
+        db.create_all()
+        # Migration: add equip_id column if it doesn't exist
+        with db.engine.connect() as conn:
+            try:
+                conn.execute(db.text("ALTER TABLE equipment_items ADD COLUMN equip_id VARCHAR(20)"))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
+        # Backfill equip_id for any existing rows that lack it
+        items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
+        for item in items_without_id:
+            item.equip_id = f"EQ-{item.id:04d}"
+        if items_without_id:
+            db.session.commit()
+        # Seed equipment names and types if tables are empty
+        if EquipmentName.query.count() == 0:
+            for n in DEFAULT_EQUIP_NAMES:
+                db.session.add(EquipmentName(name=n))
+        if EquipmentType.query.count() == 0:
+            for t in DEFAULT_EQUIP_TYPES:
+                db.session.add(EquipmentType(name=t))
         db.session.commit()
-    # Seed equipment names and types if tables are empty
-    if EquipmentName.query.count() == 0:
-        for n in DEFAULT_EQUIP_NAMES:
-            db.session.add(EquipmentName(name=n))
-    if EquipmentType.query.count() == 0:
-        for t in DEFAULT_EQUIP_TYPES:
-            db.session.add(EquipmentType(name=t))
-    db.session.commit()
+
+
+def normalized_text(value):
+    return " ".join((value or "").strip().casefold().split())
+
+
+def find_duplicate_account(name, location, exclude_id=None):
+    normalized_name = normalized_text(name)
+    normalized_location = normalized_text(location)
+    query = Account.query
+    if exclude_id is not None:
+        query = query.filter(Account.id != exclude_id)
+    for account in query.all():
+        if (
+            normalized_text(account.name) == normalized_name
+            and normalized_text(account.location) == normalized_location
+        ):
+            return account
+    return None
 
 
 def get_equip_names():
@@ -106,6 +140,10 @@ def add_account():
         if not name or not location:
             flash('Name and location are required.', 'error')
             return render_template('account_form.html', action='Add', account=None)
+        duplicate = find_duplicate_account(name, location)
+        if duplicate:
+            flash(f'Account "{duplicate.name}" at {duplicate.location} already exists. Use Edit instead of adding a duplicate.', 'warning')
+            return redirect(url_for('accounts'))
         acct = Account(name=name, account_type=account_type, location=location)
         db.session.add(acct)
         db.session.commit()
@@ -128,6 +166,13 @@ def edit_account(account_id):
         acct.name = request.form['name'].strip()
         acct.account_type = request.form['account_type']
         acct.location = request.form['location'].strip()
+        if not acct.name or not acct.location:
+            flash('Name and location are required.', 'error')
+            return render_template('account_form.html', action='Edit', account=acct)
+        duplicate = find_duplicate_account(acct.name, acct.location, exclude_id=acct.id)
+        if duplicate:
+            flash(f'Account "{duplicate.name}" at {duplicate.location} already exists. Merge or edit the existing account instead.', 'warning')
+            return redirect(url_for('accounts'))
         db.session.commit()
         flash(f'Account "{acct.name}" updated.', 'success')
         return redirect(url_for('accounts'))
