@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName, EquipmentType
 from datetime import datetime, date
 import os
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
@@ -37,6 +38,23 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 if _db_url.startswith('postgresql://'):
     _db_url = _db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
+if _db_url.startswith('postgresql+pg8000://'):
+    _url_parts = urlsplit(_db_url)
+    _query_pairs = parse_qsl(_url_parts.query, keep_blank_values=True)
+    _remaining_query = []
+    _ssl_required = False
+    for key, value in _query_pairs:
+        if key == 'sslmode':
+            _ssl_required = value in ('require', 'verify-ca', 'verify-full')
+            continue
+        _remaining_query.append((key, value))
+    if _ssl_required:
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'connect_args': {
+                'ssl_context': True,
+            },
+        }
+    _db_url = urlunsplit(_url_parts._replace(query=urlencode(_remaining_query)))
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
