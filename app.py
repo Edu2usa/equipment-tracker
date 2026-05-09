@@ -43,11 +43,13 @@ if _db_url.startswith('postgresql+pg8000://'):
     _query_pairs = parse_qsl(_url_parts.query, keep_blank_values=True)
     _remaining_query = []
     _ssl_required = False
+    _pg8000_query_keys = {'timeout', 'tcp_keepalive', 'application_name'}
     for key, value in _query_pairs:
         if key == 'sslmode':
             _ssl_required = value in ('require', 'verify-ca', 'verify-full')
             continue
-        _remaining_query.append((key, value))
+        if key in _pg8000_query_keys:
+            _remaining_query.append((key, value))
     if _ssl_required:
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'connect_args': {
