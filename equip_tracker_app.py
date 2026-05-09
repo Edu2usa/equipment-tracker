@@ -631,7 +631,10 @@ def add_account():
 def edit_account(account_id):
     acct = Account.query.get(account_id)
     if not acct:
-        flash('That account no longer exists. It may have already been deleted.', 'error')
+        if Account.query.count() == 0:
+            flash('No accounts exist yet. Add an account first, then you can edit it.', 'warning')
+            return redirect(url_for('add_account'))
+        flash('That account no longer exists. Choose an account from the list below.', 'warning')
         return redirect(url_for('accounts'))
     if request.method == 'POST':
         acct.name         = request.form['name'].strip()
@@ -647,7 +650,10 @@ def edit_account(account_id):
 def delete_account(account_id):
     acct = Account.query.get(account_id)
     if not acct:
-        flash('That account was not found. It may have already been deleted.', 'error')
+        if Account.query.count() == 0:
+            flash('No accounts exist yet. Add an account first.', 'warning')
+            return redirect(url_for('add_account'))
+        flash('That account was not found. It may have already been deleted.', 'warning')
         return redirect(url_for('accounts'))
     if request.method == 'GET':
         flash('Use the Delete button on an account row to confirm deletion.', 'error')
