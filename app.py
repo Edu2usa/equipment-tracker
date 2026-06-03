@@ -85,6 +85,7 @@ EQUIPMENT_NAME_RENAMES = {
 }
 
 LEGACY_EQUIPMENT_NAMES = {
+    "Barrel",
     "Backpack Vacuum",
     "Upright Vacuum",
     "Wet/Dry Vacuum",
