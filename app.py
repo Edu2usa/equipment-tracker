@@ -406,9 +406,10 @@ def add_equipment():
         quantity_raw = request.form.get('quantity', '1').strip()
         item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
+        equipment_type = equipment_type or 'N/A'
 
-        if not name or not equipment_type or not account_id_raw:
-            flash('Equipment name, model, and account are required.', 'error')
+        if not name or not account_id_raw:
+            flash('Equipment name and account are required.', 'error')
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
                                    equip_types=equip_types, service_types=service_types,
@@ -484,9 +485,10 @@ def edit_equipment(item_id):
         quantity_raw = request.form.get('quantity', '1').strip()
         item_status = request.form.get('item_status', 'working')
         last_service_raw = request.form.get('last_service_date', '').strip()
+        equipment_type = equipment_type or 'N/A'
 
-        if not name or not equipment_type or not account_id_raw:
-            flash('Equipment name, model, and account are required.', 'error')
+        if not name or not account_id_raw:
+            flash('Equipment name and account are required.', 'error')
             return render_template('equipment_form.html', action='Edit', item=item,
                                    accounts=accounts, equip_names=equip_names,
                                    equip_types=equip_types, service_types=service_types)
