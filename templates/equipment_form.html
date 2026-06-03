@@ -9,6 +9,13 @@
 
 <div class="card form-card">
   <form method="POST">
+    {% if selected_account %}
+    <div class="equip-id-badge">
+      <span class="equip-id-label">Adding For</span>
+      <span class="equip-id-value">{{ selected_account.name }}</span>
+    </div>
+    <input type="hidden" name="return_to_account" value="1" />
+    {% endif %}
 
     {% if item and item.equip_id %}
     <div class="equip-id-badge">
@@ -71,7 +78,7 @@
         <select id="account_id" name="account_id" class="form-control" required>
           <option value="">-- Select Account --</option>
           {% for acct in accounts %}
-          <option value="{{ acct.id }}" {% if item and item.account_id == acct.id %}selected{% endif %}>
+          <option value="{{ acct.id }}" {% if (item and item.account_id == acct.id) or (selected_account_id|default('') == acct.id|string) %}selected{% endif %}>
             {{ acct.name }}{% if acct.location %} ({{ acct.location }}){% endif %}
           </option>
           {% endfor %}
@@ -112,7 +119,7 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">{{ action }} Equipment</button>
+      <button type="submit" class="btn btn-primary">{% if selected_account %}Save + Add Another{% else %}{{ action }} Equipment{% endif %}</button>
       <a href="{{ url_for('equipment') }}" class="btn btn-outline">Cancel</a>
     </div>
   </form>

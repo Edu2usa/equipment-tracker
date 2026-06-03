@@ -72,11 +72,34 @@ def require_persistent_database_in_production():
 
 DEFAULT_EQUIP_NAMES = [
     "Canister Vacuum", "Backpack Vacuum - Cord", "Backpack Vacuum - Battery",
-    "Barrel Vacuum - Solo", "Barrel Vacuum - Double", "Barrel Vacuum - Cart",
+    "Barrel Solo", "Barrel Double", "Barrel - Cart",
     "Narrow Buffer", "Wide Buffer", "Extractor", "Scrubber",
     "Walk-Behind Scrubber", "Ride-On Scrubber", "Mop Bucket", "Maid Cart",
     "Ladder", "Fan", "Other",
 ]
+
+EQUIPMENT_NAME_RENAMES = {
+    "Barrel Vacuum - Solo": "Barrel Solo",
+    "Barrel Vacuum - Double": "Barrel Double",
+    "Barrel Vacuum - Cart": "Barrel - Cart",
+}
+
+LEGACY_EQUIPMENT_NAMES = {
+    "Backpack Vacuum",
+    "Upright Vacuum",
+    "Wet/Dry Vacuum",
+    "HEPA Vacuum",
+    "Auto Scrubber - Walk-Behind",
+    "Auto Scrubber - Ride-On",
+    "Auto Scrubber – Walk-Behind",
+    "Auto Scrubber – Ride-On",
+    "Floor Buffer / Burnisher",
+    "Carpet Extractor",
+    "Pressure Washer",
+    "Air Mover / Blower",
+    "Cleaning Cart",
+    "Squeegee Set",
+}
 
 DEFAULT_EQUIP_MODELS = [
     "Tennant", "Nobles", "ProTeam", "Hoover", "Sanitaire", "Nilfisk",
@@ -142,6 +165,38 @@ def find_duplicate_account(name, exclude_id=None):
     return None
 
 
+def cleanup_equipment_catalog():
+    for old_name, new_name in EQUIPMENT_NAME_RENAMES.items():
+        for item in EquipmentItem.query.filter_by(name=old_name).all():
+            item.name = new_name
+        old_record = EquipmentName.query.filter_by(name=old_name).first()
+        if old_record:
+            new_record = EquipmentName.query.filter_by(name=new_name).first()
+            if new_record:
+                db.session.delete(old_record)
+            else:
+                old_record.name = new_name
+
+    legacy_names = {normalized_text(name) for name in LEGACY_EQUIPMENT_NAMES}
+    default_names = {normalized_text(name) for name in DEFAULT_EQUIP_NAMES}
+    for record in EquipmentName.query.all():
+        normalized_name = normalized_text(record.name)
+        if record.name.startswith("QA ") or (
+            normalized_name in legacy_names and normalized_name not in default_names
+        ):
+            db.session.delete(record)
+
+    for model in (EquipmentType, EquipmentServiceType):
+        for record in model.query.all():
+            if record.name.startswith("QA "):
+                db.session.delete(record)
+
+    for item in EquipmentItem.query.all():
+        if item.name.startswith("QA "):
+            MaintenanceRecord.query.filter_by(equipment_id=item.id).delete()
+            db.session.delete(item)
+
+
 with app.app_context():
     if not PERSISTENT_DATABASE_CONFIGURED:
         # Do not create a misleading per-instance SQLite database in production.
@@ -166,6 +221,7 @@ with app.app_context():
         if items_without_id:
             db.session.commit()
         # Seed equipment names, models, and service types.
+        cleanup_equipment_catalog()
         for n in DEFAULT_EQUIP_NAMES:
             if not EquipmentName.query.filter_by(name=n).first():
                 db.session.add(EquipmentName(name=n))
@@ -339,6 +395,8 @@ def add_equipment():
     equip_names = get_equip_names()
     equip_types = get_equip_types()
     service_types = get_service_types()
+    selected_account_id = request.args.get('account_id', '').strip()
+    selected_account = Account.query.get(int(selected_account_id)) if selected_account_id.isdigit() else None
     if request.method == 'POST':
         name = (request.form.get('custom_name') or request.form.get('name') or '').strip()
         equipment_type = (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip()
@@ -352,7 +410,9 @@ def add_equipment():
             flash('Equipment name, model, and account are required.', 'error')
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
+                                   equip_types=equip_types, service_types=service_types,
+                                   selected_account_id=selected_account_id,
+                                   selected_account=selected_account)
 
         try:
             account_id = int(account_id_raw)
@@ -361,14 +421,18 @@ def add_equipment():
             flash('Invalid account or quantity value.', 'error')
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
+                                   equip_types=equip_types, service_types=service_types,
+                                   selected_account_id=selected_account_id,
+                                   selected_account=selected_account)
 
         if not Account.query.get(account_id):
             flash('Selected account no longer exists. Choose an account from the list.', 'error')
             accounts = Account.query.order_by(Account.name).all()
             return render_template('equipment_form.html', action='Add', item=None,
                                    accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
+                                   equip_types=equip_types, service_types=service_types,
+                                   selected_account_id=selected_account_id,
+                                   selected_account=selected_account)
 
         last_service = None
         if last_service_raw:
@@ -390,11 +454,15 @@ def add_equipment():
         item.equip_id = f"EQ-{item.id:04d}"
         db.session.commit()
         flash(f'Equipment "{name}" added (ID: {item.equip_id}).', 'success')
+        if request.form.get('return_to_account') == '1':
+            return redirect(url_for('add_equipment', account_id=account_id))
         return redirect(url_for('equipment'))
 
     return render_template('equipment_form.html', action='Add', item=None,
                            accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types, service_types=service_types)
+                           equip_types=equip_types, service_types=service_types,
+                           selected_account_id=selected_account_id,
+                           selected_account=selected_account)
 
 
 @app.route('/equipment/edit/<int:item_id>', methods=['GET', 'POST'])
@@ -459,7 +527,9 @@ def edit_equipment(item_id):
 
     return render_template('equipment_form.html', action='Edit', item=item,
                            accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types, service_types=service_types)
+                           equip_types=equip_types, service_types=service_types,
+                           selected_account_id='',
+                           selected_account=None)
 
 
 @app.route('/equipment/delete/<int:item_id>', methods=['POST'])
