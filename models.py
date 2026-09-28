@@ -1,7 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import os
+from sqlalchemy import MetaData
+from database_config import database_schema
 
-db = SQLAlchemy()
+db = SQLAlchemy(metadata=MetaData(schema=database_schema(os.environ.get('DATABASE_SCHEMA'))))
 
 
 class Account(db.Model):

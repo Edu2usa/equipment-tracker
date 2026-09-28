@@ -3,6 +3,9 @@ from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName,
 from datetime import datetime, date
 import os
 import secrets
+import click
+from sqlalchemy import inspect
+from sqlalchemy.schema import CreateSchema
 from sqlalchemy.exc import SQLAlchemyError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -176,23 +179,24 @@ def find_duplicate_account(name, exclude_id=None):
     return None
 
 
-def initialize_database():
+def initialize_database(seed_accounts=True):
     if not PERSISTENT_DATABASE_CONFIGURED:
         # Do not create a misleading per-instance SQLite database in production.
         pass
     else:
+        if db.metadata.schema:
+            if db.engine.dialect.name != 'postgresql':
+                raise ValueError('DATABASE_SCHEMA is for PostgreSQL only; omit it for local SQLite.')
+            with db.engine.begin() as conn:
+                conn.execute(CreateSchema(db.metadata.schema, if_not_exists=True))
         db.create_all()
         # Migration: add equip_id column if it doesn't exist
-        with db.engine.connect() as conn:
-            for statement in (
-                "ALTER TABLE equipment_items ADD COLUMN IF NOT EXISTS equip_id VARCHAR(20)",
-                "ALTER TABLE equipment_items ADD COLUMN IF NOT EXISTS service_type VARCHAR(80)",
-            ):
-                try:
-                    conn.execute(db.text(statement))
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
+        columns = {column['name'] for column in inspect(db.engine).get_columns('equipment_items', schema=db.metadata.schema)}
+        table_name = db.engine.dialect.identifier_preparer.format_table(EquipmentItem.__table__)
+        with db.engine.begin() as conn:
+            for column_name, sql_type in (('equip_id', 'VARCHAR(20)'), ('service_type', 'VARCHAR(80)')):
+                if column_name not in columns:
+                    conn.execute(db.text(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {sql_type}'))
         # Backfill equip_id for any existing rows that lack it
         items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
         for item in items_without_id:
@@ -209,7 +213,7 @@ def initialize_database():
         for service_type in DEFAULT_SERVICE_TYPES:
             if not EquipmentServiceType.query.filter_by(name=service_type).first():
                 db.session.add(EquipmentServiceType(name=service_type))
-        for account_name, account_type in DEFAULT_ACCOUNTS:
+        for account_name, account_type in (DEFAULT_ACCOUNTS if seed_accounts else []):
             existing_account = find_duplicate_account(account_name)
             if not existing_account:
                 db.session.add(Account(name=account_name, account_type=account_type, location=''))
@@ -217,9 +221,10 @@ def initialize_database():
 
 
 @app.cli.command('init-db')
-def init_db_command():
+@click.option('--empty-accounts', is_flag=True, help='Start with no sample accounts or equipment.')
+def init_db_command(empty_accounts):
     """Explicit, additive setup; never delete or rename existing inventory."""
-    initialize_database()
+    initialize_database(seed_accounts=not empty_accounts)
     print('Database initialized.')
 
 

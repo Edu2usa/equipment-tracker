@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+os.environ.pop('DATABASE_SCHEMA', None)
 os.environ['SECRET_KEY'] = 'local-test-only'
 from app import app, db, initialize_database
 from models import Account, EquipmentItem, MaintenanceRecord
@@ -85,6 +86,12 @@ class EquipmentTests(unittest.TestCase):
         initialize_database()
         self.assertEqual(EquipmentItem.query.count(), 1)
         self.assertEqual(Account.query.filter_by(name='BELIMO').one().account_type, 'warehouse')
+
+    def test_fresh_setup_does_not_add_sample_accounts_or_equipment(self):
+        initialize_database(seed_accounts=False)
+        self.assertEqual(Account.query.count(), 1)
+        self.assertEqual(EquipmentItem.query.count(), 0)
+        self.assertEqual(MaintenanceRecord.query.count(), 0)
 
     def test_database_failure_is_clear_and_redacted(self):
         with patch.object(db.session, 'query', side_effect=OperationalError('secret statement', {}, Exception('secret password'))):
