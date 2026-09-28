@@ -3,21 +3,21 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>Equipment</h1>
+  <div><p class="eyebrow">Inventory</p><h1>Equipment</h1><p class="page-subtitle">Find it. Service it. Get it to the right account.</p></div>
   <a href="{{ url_for('add_equipment') }}" class="btn btn-primary">+ Add Equipment</a>
 </div>
 
 <div class="card filter-card">
   <form method="GET" class="filter-form">
-    <input type="text" name="search" class="form-control" placeholder="Search equipment, model, or service type..."
+    <input aria-label="Search equipment" type="search" name="search" class="form-control" placeholder="Search equipment, model, or service type..."
            value="{{ search }}" />
-    <select name="status" class="form-control">
+    <select aria-label="Equipment status" name="status" class="form-control">
       <option value="">All Status</option>
       <option value="working" {% if status_filter == 'working' %}selected{% endif %}>Working</option>
       <option value="in_repair" {% if status_filter == 'in_repair' %}selected{% endif %}>In Repair</option>
       <option value="in_storage" {% if status_filter == 'in_storage' %}selected{% endif %}>In Storage</option>
     </select>
-    <select name="account" class="form-control">
+    <select aria-label="Account" name="account" class="form-control">
       <option value="">All Accounts</option>
       {% for acct in accounts %}
       <option value="{{ acct.id }}" {% if account_filter == acct.id|string %}selected{% endif %}>{{ acct.name }}</option>
@@ -45,7 +45,7 @@
     <tbody>
       {% for item in items %}
       <tr>
-        <td class="bold">{{ item.name }}</td>
+        <td class="bold">{{ item.name }}<small class="record-id">{{ item.equip_id or 'ID pending' }}</small></td>
         <td>{{ item.equipment_type }}</td>
         <td>{{ item.service_type or '-' }}</td>
         <td>{{ item.account.name }}</td>
@@ -56,7 +56,7 @@
           <a href="{{ url_for('edit_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Edit</a>
           <a href="{{ url_for('transfer_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Transfer</a>
           <form method="POST" action="{{ url_for('delete_equipment', item_id=item.id) }}"
-                onsubmit="return confirm('Delete {{ item.name }}?');" style="display:inline;">
+                onsubmit="return confirm('Delete this equipment and its maintenance history? This cannot be undone.');" style="display:inline;">
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
           </form>
         </td>

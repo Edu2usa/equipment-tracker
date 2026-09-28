@@ -2,10 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName, EquipmentType, EquipmentServiceType
 from datetime import datetime, date
 import os
+import secrets
+from sqlalchemy.exc import SQLAlchemyError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'preferred-maintenance-secret-key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Use a hosted Postgres URL in production. Local development may use SQLite,
@@ -60,6 +62,14 @@ if _db_url.startswith('postgresql+pg8000://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
+
+
+@app.errorhandler(SQLAlchemyError)
+def database_unavailable(error):
+    db.session.rollback()
+    # Never expose credentials or SQL parameters in the browser.
+    app.logger.error('Database request failed: %s', type(error).__name__)
+    return render_template('database_unavailable.html'), 503
 
 
 @app.before_request
@@ -166,39 +176,7 @@ def find_duplicate_account(name, exclude_id=None):
     return None
 
 
-def cleanup_equipment_catalog():
-    for old_name, new_name in EQUIPMENT_NAME_RENAMES.items():
-        for item in EquipmentItem.query.filter_by(name=old_name).all():
-            item.name = new_name
-        old_record = EquipmentName.query.filter_by(name=old_name).first()
-        if old_record:
-            new_record = EquipmentName.query.filter_by(name=new_name).first()
-            if new_record:
-                db.session.delete(old_record)
-            else:
-                old_record.name = new_name
-
-    legacy_names = {normalized_text(name) for name in LEGACY_EQUIPMENT_NAMES}
-    default_names = {normalized_text(name) for name in DEFAULT_EQUIP_NAMES}
-    for record in EquipmentName.query.all():
-        normalized_name = normalized_text(record.name)
-        if record.name.startswith("QA ") or (
-            normalized_name in legacy_names and normalized_name not in default_names
-        ):
-            db.session.delete(record)
-
-    for model in (EquipmentType, EquipmentServiceType):
-        for record in model.query.all():
-            if record.name.startswith("QA "):
-                db.session.delete(record)
-
-    for item in EquipmentItem.query.all():
-        if item.name.startswith("QA "):
-            MaintenanceRecord.query.filter_by(equipment_id=item.id).delete()
-            db.session.delete(item)
-
-
-with app.app_context():
+def initialize_database():
     if not PERSISTENT_DATABASE_CONFIGURED:
         # Do not create a misleading per-instance SQLite database in production.
         pass
@@ -222,7 +200,6 @@ with app.app_context():
         if items_without_id:
             db.session.commit()
         # Seed equipment names, models, and service types.
-        cleanup_equipment_catalog()
         for n in DEFAULT_EQUIP_NAMES:
             if not EquipmentName.query.filter_by(name=n).first():
                 db.session.add(EquipmentName(name=n))
@@ -234,12 +211,40 @@ with app.app_context():
                 db.session.add(EquipmentServiceType(name=service_type))
         for account_name, account_type in DEFAULT_ACCOUNTS:
             existing_account = find_duplicate_account(account_name)
-            if existing_account:
-                existing_account.name = account_name
-                existing_account.account_type = account_type
-            else:
+            if not existing_account:
                 db.session.add(Account(name=account_name, account_type=account_type, location=''))
         db.session.commit()
+
+
+@app.cli.command('init-db')
+def init_db_command():
+    """Explicit, additive setup; never delete or rename existing inventory."""
+    initialize_database()
+    print('Database initialized.')
+
+
+# Hosted databases must be initialized explicitly, not on every cold start.
+if not _running_on_serverless and not _raw_db_url:
+    with app.app_context():
+        initialize_database()
+
+
+@app.before_request
+def validate_equipment_input():
+    if request.method != 'POST' or request.endpoint not in ('add_equipment', 'edit_equipment'):
+        return None
+    try:
+        quantity = int(request.form.get('quantity') or '1')
+        if quantity < 1:
+            raise ValueError
+        if request.form.get('item_status', 'working') not in ('working', 'in_repair', 'in_storage'):
+            raise ValueError
+        service_date = request.form.get('last_service_date', '').strip()
+        if service_date:
+            datetime.strptime(service_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Use a positive whole-number quantity, a listed status, and a valid service date.', 'error')
+        return redirect(request.path)
 
 def get_equip_names():
     return [r.name for r in EquipmentName.query.order_by(EquipmentName.name).all()]
@@ -380,8 +385,11 @@ def equipment():
         )
     if status_filter:
         query = query.filter_by(item_status=status_filter)
-    if account_filter:
+    if account_filter and account_filter.isdigit():
         query = query.filter_by(account_id=int(account_filter))
+    elif account_filter:
+        flash('Choose an account from the filter list.', 'error')
+        account_filter = ''
 
     items = query.order_by(EquipmentItem.name).all()
     accounts = Account.query.order_by(Account.name).all()
@@ -541,6 +549,7 @@ def delete_equipment(item_id):
     if not item:
         flash('That equipment item was not found. It may have already been deleted.', 'warning')
         return redirect(url_for('equipment'))
+    MaintenanceRecord.query.filter_by(equipment_id=item.id).delete()
     db.session.delete(item)
     db.session.commit()
     flash('Equipment deleted.', 'success')
@@ -613,13 +622,15 @@ def add_maintenance():
                                    today=date.today().isoformat())
 
         maintenance_type = request.form.get('maintenance_type', '').strip()
-        service_date_raw = request.form['service_date'].strip()
+        service_date_raw = request.form.get('service_date', '').strip()
         notes = request.form.get('notes', '').strip()
 
         try:
+            if not maintenance_type:
+                raise ValueError
             service_date = datetime.strptime(service_date_raw, '%Y-%m-%d').date()
         except ValueError:
-            flash('Enter a valid service date.', 'error')
+            flash('Enter a service type and a valid service date.', 'error')
             return render_template('maintenance_form.html', equipment_list=equipment_list,
                                    today=date.today().isoformat())
 

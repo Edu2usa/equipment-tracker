@@ -8,9 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/operations.css') }}" />
   <link rel="icon" href="{{ url_for('static', filename='img/preferred-maintenance-logo.png') }}" type="image/png">
 </head>
 <body>
+  {% set endpoint = request.endpoint or '' %}
+  <a class="skip-link" href="#main-content">Skip to content</a>
 
   <!-- ── NAV ────────────────────────────────────────────────────── -->
   <header class="site-header">
@@ -23,13 +26,13 @@
         </span>
       </a>
 
-      <nav class="main-nav">
+      <nav class="main-nav" aria-label="Main navigation">
         <a href="{{ url_for('dashboard') }}"   class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
-        <a href="{{ url_for('accounts') }}"    class="nav-link {% if 'account' in request.endpoint %}active{% endif %}">Accounts</a>
+        <a href="{{ url_for('accounts') }}"    class="nav-link {% if 'account' in endpoint %}active{% endif %}">Accounts</a>
         <a href="{{ url_for('equipment') }}"   class="nav-link {% if request.endpoint in ['equipment','add_equipment','edit_equipment','delete_equipment','transfer_equipment'] %}active{% endif %}">Equipment</a>
-        <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in request.endpoint %}active{% endif %}">Maintenance</a>
+        <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in endpoint %}active{% endif %}">Maintenance</a>
         <a href="{{ url_for('reports') }}"     class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
-        <a href="{{ url_for('settings') }}"    class="nav-link {% if 'settings' in request.endpoint or 'equip_name' in request.endpoint or 'equip_type' in request.endpoint or 'service_type' in request.endpoint %}active{% endif %}">Settings</a>
+        <a href="{{ url_for('settings') }}"    class="nav-link {% if 'settings' in endpoint or 'equip_name' in endpoint or 'equip_type' in endpoint or 'service_type' in endpoint %}active{% endif %}">Settings</a>
       </nav>
     </div>
   </header>
@@ -39,14 +42,14 @@
     {% if messages %}
       <div class="flash-wrap">
         {% for category, message in messages %}
-          <div class="flash flash-{{ category }}">{{ message }}</div>
+          <div role="status" class="flash flash-{{ category }}">{{ message }}</div>
         {% endfor %}
       </div>
     {% endif %}
   {% endwith %}
 
   <!-- ── PAGE CONTENT ───────────────────────────────────────────── -->
-  <main class="page-content">
+  <main id="main-content" class="page-content">
     {% block content %}{% endblock %}
   </main>
 

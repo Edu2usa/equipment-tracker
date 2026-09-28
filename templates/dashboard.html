@@ -2,29 +2,38 @@
 {% block title %}Dashboard – Preferred Maintenance{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1>Dashboard</h1>
-</div>
+<section class="overview-hero">
+  <div><p class="eyebrow">Preferred Maintenance / Operations</p><h1>Ready for the next job.</h1>
+  <p>Your equipment, its location, and what needs attention. All in one place.</p></div>
+  <a href="{{ url_for('add_equipment') }}" class="btn btn-primary">+ Add equipment</a>
+</section>
 
 <!-- Stats Cards -->
 <div class="stats-grid">
-  <div class="stat-card">
+  <a href="{{ url_for('equipment') }}" class="stat-card">
     <div class="stat-label">TOTAL EQUIPMENT</div>
     <div class="stat-value">{{ total }}</div>
-  </div>
-  <div class="stat-card working">
+  </a>
+  <a href="{{ url_for('equipment', status='working') }}" class="stat-card working">
     <div class="stat-label">WORKING</div>
     <div class="stat-value working-val">{{ working }}</div>
-  </div>
-  <div class="stat-card in-repair">
+  </a>
+  <a href="{{ url_for('equipment', status='in_repair') }}" class="stat-card in-repair">
     <div class="stat-label">IN REPAIR</div>
     <div class="stat-value repair-val">{{ in_repair }}</div>
-  </div>
-  <div class="stat-card in-storage">
+  </a>
+  <a href="{{ url_for('equipment', status='in_storage') }}" class="stat-card in-storage">
     <div class="stat-label">IN STORAGE</div>
     <div class="stat-value storage-val">{{ in_storage }}</div>
-  </div>
+  </a>
 </div>
+
+<section class="card mt-4">
+  <div class="panel-heading"><div><p class="eyebrow">Keep work moving</p><h2>Repair watch</h2></div><span class="badge badge-in_repair">{{ in_repair }} units</span></div>
+  {% for item in equipment_list if item.item_status == 'in_repair' %}
+  <a class="activity-row" href="{{ url_for('edit_equipment', item_id=item.id) }}"><span><strong>{{ item.name }}</strong><small>{{ item.account.name }} &middot; {{ item.equip_id or 'ID pending' }}</small></span><span class="badge badge-in_repair">{{ item.quantity }} in repair</span></a>
+  {% else %}<div class="empty-panel"><span class="empty-symbol">&#10003;</span><h3>No equipment marked in repair</h3><p>Update equipment status when a unit needs service.</p></div>{% endfor %}
+</section>
 
 <!-- Quick Actions -->
 <div class="card mt-4">
@@ -38,7 +47,7 @@
 
 <!-- Recently Repaired -->
 <div class="card mt-4">
-  <h2 class="section-title">Recently Repaired</h2>
+  <h2 class="section-title">Recent Maintenance</h2>
   <table class="data-table">
     <thead>
       <tr>
@@ -67,28 +76,10 @@
 
 <!-- Account Summary -->
 <div class="card mt-4">
-  <h2 class="section-title">Account Summary</h2>
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>ACCOUNT</th>
-        <th>TYPE</th>
-        <th>LOCATION</th>
-        <th>EQUIPMENT</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for acct in accounts %}
-      <tr>
-        <td class="bold">{{ acct.name }}</td>
-        <td><span class="badge badge-{{ acct.account_type }}">{{ acct.account_type.replace('_', ' ').title() }}</span></td>
-        <td>{{ acct.location or '-' }}</td>
-        <td>{{ acct.equipment_count() }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4" class="empty-row">No accounts yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="panel-heading"><div><p class="eyebrow">Where everything lives</p><h2>Equipment by account</h2></div><a class="text-link" href="{{ url_for('accounts') }}">Manage accounts &rarr;</a></div>
+  <div class="account-grid">{% for acct in accounts %}
+    <a class="account-tile" href="{{ url_for('equipment', account=acct.id) }}"><span><strong>{{ acct.name }}</strong><small>{{ acct.location or acct.account_type.replace('_', ' ').title() }}</small></span><span class="account-count">{{ acct.equipment_count() }}<small>units</small></span></a>
+    {% else %}<div class="empty-panel"><h3>Start with an account</h3><p>Add a client site or warehouse, then assign equipment.</p><a href="{{ url_for('add_account') }}" class="btn btn-primary">Add account</a></div>{% endfor %}
+  </div>
 </div>
 {% endblock %}

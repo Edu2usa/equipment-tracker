@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Connection unavailable - Equipment Tracker{% endblock %}
+{% block content %}
+<section class="card setup-card">
+  <p class="eyebrow">Connection needs attention</p>
+  <h1>We cannot reach your equipment records.</h1>
+  <p>No successful save is being reported. Check the shared database connection and schema before entering more equipment.</p>
+  <div class="setup-steps">
+    <h2>For the project administrator</h2>
+    <p>Verify the database is online and DATABASE_URL is current. On a new database, run the documented init-db command once. Do not replace the shared database with temporary storage.</p>
+  </div>
+  <a class="btn btn-primary mt-4" href="{{ url_for('dashboard') }}">Try dashboard again</a>
+</section>
+{% endblock %}
