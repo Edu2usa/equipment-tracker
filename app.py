@@ -1,5 +1,17 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
 from models import db, Account, EquipmentItem, MaintenanceRecord, EquipmentName, EquipmentType, EquipmentServiceType
+from api import api_bp
+from inventory import (
+    FieldError,
+    add_maintenance_record,
+    create_equipment,
+    due_summary,
+    equipment_search_filter,
+    find_account_filter,
+    maintenance_history,
+    update_equipment,
+)
+from security import init_app as init_security, migration_needed, running_on_serverless
 from datetime import datetime, date
 import os
 import secrets
@@ -21,20 +33,7 @@ _raw_db_url = (
     or os.environ.get('POSTGRES_PRISMA_URL')
     or os.environ.get('POSTGRES_URL_NON_POOLING')
 )
-_running_on_serverless = any(
-    os.environ.get(key)
-    for key in (
-        'VERCEL',
-        'VERCEL_ENV',
-        'VERCEL_URL',
-        'VERCEL_REGION',
-        'NOW_REGION',
-        'AWS_REGION',
-        'AWS_EXECUTION_ENV',
-        'AWS_LAMBDA_FUNCTION_NAME',
-        'LAMBDA_TASK_ROOT',
-    )
-)
+_running_on_serverless = running_on_serverless()
 _allow_sqlite_in_serverless = os.environ.get('ALLOW_SQLITE_IN_SERVERLESS') == '1'
 PERSISTENT_DATABASE_CONFIGURED = bool(_raw_db_url) or not _running_on_serverless or _allow_sqlite_in_serverless
 _db_url = _raw_db_url or ('sqlite:////tmp/equip_tracker.db' if _running_on_serverless else 'sqlite:///equip_tracker.db')
@@ -65,6 +64,8 @@ if _db_url.startswith('postgresql+pg8000://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 
 db.init_app(app)
+init_security(app)
+app.register_blueprint(api_bp)
 
 
 @app.errorhandler(SQLAlchemyError)
@@ -72,6 +73,12 @@ def database_unavailable(error):
     db.session.rollback()
     # Never expose credentials or SQL parameters in the browser.
     app.logger.error('Database request failed: %s', type(error).__name__)
+    if request.path.startswith('/api/'):
+        if migration_needed(error):
+            return jsonify(error='The database is missing a required update. Run the SQL migration, then try again.'), 503
+        return jsonify(error='The database is unavailable.'), 503
+    if migration_needed(error):
+        return render_template('migration_required.html'), 503
     return render_template('database_unavailable.html'), 503
 
 
@@ -193,10 +200,30 @@ def initialize_database(seed_accounts=True):
         # Migration: add equip_id column if it doesn't exist
         columns = {column['name'] for column in inspect(db.engine).get_columns('equipment_items', schema=db.metadata.schema)}
         table_name = db.engine.dialect.identifier_preparer.format_table(EquipmentItem.__table__)
+        maintenance_columns = {
+            column['name']
+            for column in inspect(db.engine).get_columns('maintenance_records', schema=db.metadata.schema)
+        }
+        maintenance_table = db.engine.dialect.identifier_preparer.format_table(MaintenanceRecord.__table__)
         with db.engine.begin() as conn:
-            for column_name, sql_type in (('equip_id', 'VARCHAR(20)'), ('service_type', 'VARCHAR(80)')):
+            # Local SQLite only. Production uses supabase/migrations and a role that cannot ALTER.
+            for column_name, sql_type in (
+                ('equip_id', 'VARCHAR(20)'),
+                ('service_type', 'VARCHAR(80)'),
+                ('service_interval_days', 'INTEGER'),
+                ('serial_number', 'VARCHAR(120)'),
+                ('purchase_date', 'DATE'),
+                ('notes', 'TEXT'),
+            ):
                 if column_name not in columns:
                     conn.execute(db.text(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {sql_type}'))
+            for column_name, sql_type in (
+                ('cost', 'NUMERIC(12, 2)'),
+                ('vendor', 'VARCHAR(120)'),
+                ('invoice_ref', 'VARCHAR(120)'),
+            ):
+                if column_name not in maintenance_columns:
+                    conn.execute(db.text(f'ALTER TABLE {maintenance_table} ADD COLUMN {column_name} {sql_type}'))
         # Backfill equip_id for any existing rows that lack it
         items_without_id = EquipmentItem.query.filter(EquipmentItem.equip_id == None).all()
         for item in items_without_id:
@@ -247,9 +274,47 @@ def validate_equipment_input():
         service_date = request.form.get('last_service_date', '').strip()
         if service_date:
             datetime.strptime(service_date, '%Y-%m-%d')
+        interval = request.form.get('service_interval_days', '').strip()
+        if interval:
+            parsed_interval = int(interval)
+            if parsed_interval < 1 or parsed_interval > 3650:
+                raise ValueError
+        purchase_date = request.form.get('purchase_date', '').strip()
+        if purchase_date:
+            datetime.strptime(purchase_date, '%Y-%m-%d')
     except ValueError:
-        flash('Use a positive whole-number quantity, a listed status, and a valid service date.', 'error')
+        flash('Use a positive whole-number quantity, a listed status, and valid service, purchase, and interval values.', 'error')
         return redirect(request.path)
+
+
+def equipment_form_payload():
+    return {
+        'name': (request.form.get('custom_name') or request.form.get('name') or '').strip(),
+        'equipment_type': (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip(),
+        'service_type': (request.form.get('custom_service_type') or request.form.get('service_type') or '').strip(),
+        'account_id': request.form.get('account_id', '').strip(),
+        'quantity': request.form.get('quantity', '1').strip() or '1',
+        'item_status': request.form.get('item_status', 'working'),
+        'last_service_date': request.form.get('last_service_date', '').strip(),
+        'service_interval_days': request.form.get('service_interval_days', '').strip(),
+        'serial_number': request.form.get('serial_number', '').strip(),
+        'purchase_date': request.form.get('purchase_date', '').strip(),
+        'notes': request.form.get('notes', '').strip(),
+    }
+
+
+def equipment_form_context(action, item, accounts, equip_names, equip_types, service_types, selected_account_id, selected_account):
+    return render_template(
+        'equipment_form.html',
+        action=action,
+        item=item,
+        accounts=accounts,
+        equip_names=equip_names,
+        equip_types=equip_types,
+        service_types=service_types,
+        selected_account_id=selected_account_id,
+        selected_account=selected_account,
+    )
 
 def get_equip_names():
     return [r.name for r in EquipmentName.query.order_by(EquipmentName.name).all()]
@@ -260,12 +325,6 @@ def get_equip_types():
 
 def get_service_types():
     return [r.name for r in EquipmentServiceType.query.order_by(EquipmentServiceType.name).all()]
-
-
-def remember_option(model, value):
-    value = (value or "").strip()
-    if value and not model.query.filter_by(name=value).first():
-        db.session.add(model(name=value))
 
 
 # ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -381,20 +440,15 @@ def equipment():
 
     query = EquipmentItem.query
     if search:
-        query = query.filter(
-            db.or_(
-                EquipmentItem.name.ilike(f'%{search}%'),
-                EquipmentItem.equipment_type.ilike(f'%{search}%'),
-                EquipmentItem.service_type.ilike(f'%{search}%'),
-            )
-        )
+        query = query.filter(equipment_search_filter(search))
     if status_filter:
         query = query.filter_by(item_status=status_filter)
-    if account_filter and account_filter.isdigit():
-        query = query.filter_by(account_id=int(account_filter))
-    elif account_filter:
+    account_id = find_account_filter(account_filter, strict=False)
+    if account_id is False:
         flash('Choose an account from the filter list.', 'error')
         account_filter = ''
+    elif account_id is not None:
+        query = query.filter_by(account_id=account_id)
 
     items = query.order_by(EquipmentItem.name).all()
     accounts = Account.query.order_by(Account.name).all()
@@ -412,72 +466,25 @@ def add_equipment():
     selected_account_id = request.args.get('account_id', '').strip()
     selected_account = Account.query.get(int(selected_account_id)) if selected_account_id.isdigit() else None
     if request.method == 'POST':
-        name = (request.form.get('custom_name') or request.form.get('name') or '').strip()
-        equipment_type = (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip()
-        service_type = (request.form.get('custom_service_type') or request.form.get('service_type') or '').strip()
-        account_id_raw = request.form.get('account_id', '').strip()
-        quantity_raw = request.form.get('quantity', '1').strip()
-        item_status = request.form.get('item_status', 'working')
-        last_service_raw = request.form.get('last_service_date', '').strip()
-        equipment_type = equipment_type or 'N/A'
-
-        if not name or not account_id_raw:
-            flash('Equipment name and account are required.', 'error')
-            return render_template('equipment_form.html', action='Add', item=None,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types,
-                                   selected_account_id=selected_account_id,
-                                   selected_account=selected_account)
-
         try:
-            account_id = int(account_id_raw)
-            quantity = int(quantity_raw) if quantity_raw else 1
-        except ValueError:
-            flash('Invalid account or quantity value.', 'error')
-            return render_template('equipment_form.html', action='Add', item=None,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types,
-                                   selected_account_id=selected_account_id,
-                                   selected_account=selected_account)
-
-        if not Account.query.get(account_id):
-            flash('Selected account no longer exists. Choose an account from the list.', 'error')
-            accounts = Account.query.order_by(Account.name).all()
-            return render_template('equipment_form.html', action='Add', item=None,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types,
-                                   selected_account_id=selected_account_id,
-                                   selected_account=selected_account)
-
-        last_service = None
-        if last_service_raw:
-            try:
-                last_service = datetime.strptime(last_service_raw, '%Y-%m-%d').date()
-            except ValueError:
-                pass
-
-        item = EquipmentItem(
-            name=name, equipment_type=equipment_type, service_type=service_type,
-            account_id=account_id, quantity=quantity,
-            item_status=item_status, last_service_date=last_service
-        )
-        remember_option(EquipmentName, name)
-        remember_option(EquipmentType, equipment_type)
-        remember_option(EquipmentServiceType, service_type)
-        db.session.add(item)
-        db.session.flush()
-        item.equip_id = f"EQ-{item.id:04d}"
-        db.session.commit()
-        flash(f'Equipment "{name}" added (ID: {item.equip_id}).', 'success')
+            item = create_equipment(equipment_form_payload())
+            db.session.commit()
+        except FieldError as error:
+            db.session.rollback()
+            flash(error.message, 'error')
+            return equipment_form_context(
+                'Add', None, accounts, equip_names, equip_types, service_types,
+                selected_account_id, selected_account,
+            )
+        flash(f'Equipment "{item.name}" added (ID: {item.equip_id}).', 'success')
         if request.form.get('return_to_account') == '1':
-            return redirect(url_for('add_equipment', account_id=account_id))
+            return redirect(url_for('add_equipment', account_id=item.account_id))
         return redirect(url_for('equipment'))
 
-    return render_template('equipment_form.html', action='Add', item=None,
-                           accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types, service_types=service_types,
-                           selected_account_id=selected_account_id,
-                           selected_account=selected_account)
+    return equipment_form_context(
+        'Add', None, accounts, equip_names, equip_types, service_types,
+        selected_account_id, selected_account,
+    )
 
 
 @app.route('/equipment/edit/<int:item_id>', methods=['GET', 'POST'])
@@ -491,61 +498,36 @@ def edit_equipment(item_id):
     equip_types = get_equip_types()
     service_types = get_service_types()
     if request.method == 'POST':
-        name = (request.form.get('custom_name') or request.form.get('name') or '').strip()
-        equipment_type = (request.form.get('custom_equipment_type') or request.form.get('equipment_type') or '').strip()
-        service_type = (request.form.get('custom_service_type') or request.form.get('service_type') or '').strip()
-        account_id_raw = request.form.get('account_id', '').strip()
-        quantity_raw = request.form.get('quantity', '1').strip()
-        item_status = request.form.get('item_status', 'working')
-        last_service_raw = request.form.get('last_service_date', '').strip()
-        equipment_type = equipment_type or 'N/A'
-
-        if not name or not account_id_raw:
-            flash('Equipment name and account are required.', 'error')
-            return render_template('equipment_form.html', action='Edit', item=item,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
-
         try:
-            account_id = int(account_id_raw)
-            quantity = int(quantity_raw) if quantity_raw else 1
-        except ValueError:
-            flash('Invalid account or quantity value.', 'error')
-            return render_template('equipment_form.html', action='Edit', item=item,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
-
-        if not Account.query.get(account_id):
-            flash('Selected account no longer exists. Choose an account from the list.', 'error')
-            accounts = Account.query.order_by(Account.name).all()
-            return render_template('equipment_form.html', action='Edit', item=item,
-                                   accounts=accounts, equip_names=equip_names,
-                                   equip_types=equip_types, service_types=service_types)
-
-        item.name = name
-        item.equipment_type = equipment_type
-        item.service_type = service_type
-        item.account_id = account_id
-        item.quantity = quantity
-        item.item_status = item_status
-        item.last_service_date = None
-        if last_service_raw:
-            try:
-                item.last_service_date = datetime.strptime(last_service_raw, '%Y-%m-%d').date()
-            except ValueError:
-                pass
-        remember_option(EquipmentName, name)
-        remember_option(EquipmentType, equipment_type)
-        remember_option(EquipmentServiceType, service_type)
-        db.session.commit()
+            update_equipment(item, equipment_form_payload(), partial=False)
+            db.session.commit()
+        except FieldError as error:
+            db.session.rollback()
+            flash(error.message, 'error')
+            return equipment_form_context(
+                'Edit', item, accounts, equip_names, equip_types, service_types, '', None,
+            )
         flash(f'Equipment "{item.name}" updated.', 'success')
-        return redirect(url_for('equipment'))
+        return redirect(url_for('equipment_detail', item_id=item.id))
 
-    return render_template('equipment_form.html', action='Edit', item=item,
-                           accounts=accounts, equip_names=equip_names,
-                           equip_types=equip_types, service_types=service_types,
-                           selected_account_id='',
-                           selected_account=None)
+    return equipment_form_context(
+        'Edit', item, accounts, equip_names, equip_types, service_types, '', None,
+    )
+
+
+@app.route('/equipment/<int:item_id>')
+def equipment_detail(item_id):
+    item = EquipmentItem.query.get(item_id)
+    if not item:
+        flash('That equipment item no longer exists. Choose an item from the list below.', 'warning')
+        return redirect(url_for('equipment'))
+    return render_template(
+        'equipment_detail.html',
+        item=item,
+        history=maintenance_history(item),
+        due=due_summary(item),
+        machine_url=url_for('equipment_detail', item_id=item.id, _external=True),
+    )
 
 
 @app.route('/equipment/delete/<int:item_id>', methods=['POST'])
@@ -608,55 +590,61 @@ def maintenance():
     return render_template('maintenance.html', records=records, search=search)
 
 
+def maintenance_form_page(equipment_list, selected_equipment_id, return_to_machine):
+    return render_template(
+        'maintenance_form.html',
+        equipment_list=equipment_list,
+        today=date.today().isoformat(),
+        selected_equipment_id=selected_equipment_id,
+        return_to_machine=return_to_machine,
+    )
+
+
 @app.route('/maintenance/add', methods=['GET', 'POST'])
 def add_maintenance():
     equipment_list = EquipmentItem.query.order_by(EquipmentItem.name).all()
-    if request.method == 'POST':
-        try:
-            equipment_id = int(request.form.get('equipment_id', ''))
-        except ValueError:
-            flash('Choose equipment before saving a maintenance record.', 'error')
-            return render_template('maintenance_form.html', equipment_list=equipment_list,
-                                   today=date.today().isoformat())
-
-        equipment = EquipmentItem.query.get(equipment_id)
-        if not equipment:
-            flash('Selected equipment no longer exists. Choose an item from the list.', 'error')
-            equipment_list = EquipmentItem.query.order_by(EquipmentItem.name).all()
-            return render_template('maintenance_form.html', equipment_list=equipment_list,
-                                   today=date.today().isoformat())
-
-        maintenance_type = request.form.get('maintenance_type', '').strip()
-        service_date_raw = request.form.get('service_date', '').strip()
-        notes = request.form.get('notes', '').strip()
-
-        try:
-            if not maintenance_type:
-                raise ValueError
-            service_date = datetime.strptime(service_date_raw, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Enter a service type and a valid service date.', 'error')
-            return render_template('maintenance_form.html', equipment_list=equipment_list,
-                                   today=date.today().isoformat())
-
-        record = MaintenanceRecord(
-            equipment_id=equipment_id,
-            maintenance_type=maintenance_type,
-            service_date=service_date,
-            notes=notes
+    if request.method == 'GET':
+        selected = request.args.get('equipment_id', '').strip()
+        selected_equipment_id = int(selected) if selected.isdigit() else ''
+        return maintenance_form_page(
+            equipment_list,
+            selected_equipment_id,
+            request.args.get('return_to') == 'machine',
         )
-        db.session.add(record)
+    return_to_machine = request.form.get('return_to') == 'machine'
+    try:
+        equipment_id = int(request.form.get('equipment_id', ''))
+    except (TypeError, ValueError):
+        flash('Choose equipment before saving a maintenance record.', 'error')
+        return maintenance_form_page(equipment_list, '', return_to_machine)
 
-        if equipment.last_service_date is None or service_date > equipment.last_service_date:
-            equipment.last_service_date = service_date
-            if request.form.get('mark_working') == 'yes':
-                equipment.item_status = 'working'
+    equipment = EquipmentItem.query.get(equipment_id)
+    if not equipment:
+        flash('Selected equipment no longer exists. Choose an item from the list.', 'error')
+        equipment_list = EquipmentItem.query.order_by(EquipmentItem.name).all()
+        return maintenance_form_page(equipment_list, '', return_to_machine)
 
+    try:
+        add_maintenance_record(equipment, {
+            'equipment_id': equipment_id,
+            'maintenance_type': request.form.get('maintenance_type', ''),
+            'service_date': request.form.get('service_date', ''),
+            'notes': request.form.get('notes', ''),
+            'cost': request.form.get('cost', ''),
+            'vendor': request.form.get('vendor', ''),
+            'invoice_ref': request.form.get('invoice_ref', ''),
+            'mark_working': request.form.get('mark_working'),
+        })
         db.session.commit()
-        flash('Maintenance record logged.', 'success')
-        return redirect(url_for('maintenance'))
-    return render_template('maintenance_form.html', equipment_list=equipment_list,
-                           today=date.today().isoformat())
+    except FieldError as error:
+        db.session.rollback()
+        flash(error.message, 'error')
+        return maintenance_form_page(equipment_list, equipment_id, return_to_machine)
+
+    flash('Maintenance record logged.', 'success')
+    if return_to_machine:
+        return redirect(url_for('equipment_detail', item_id=equipment.id))
+    return redirect(url_for('maintenance'))
 
 
 @app.route('/maintenance/delete/<int:record_id>', methods=['POST'])

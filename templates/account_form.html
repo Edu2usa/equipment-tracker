@@ -9,6 +9,7 @@
 
 <div class="card form-card">
   <form method="POST">
+    {% include "_csrf.html" %}
     <div class="form-group">
       <label for="name">Account Name</label>
       <input type="text" id="name" name="name" class="form-control"

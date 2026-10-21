@@ -9,13 +9,17 @@
 
 <div class="card form-card">
   <form method="POST">
+    {% include "_csrf.html" %}
+    {% if return_to_machine %}
+    <input type="hidden" name="return_to" value="machine" />
+    {% endif %}
     <div class="form-row">
       <div class="form-group">
         <label for="equipment_id">Equipment</label>
         <select id="equipment_id" name="equipment_id" class="form-control" required>
           <option value="">-- Select Equipment --</option>
           {% for eq in equipment_list %}
-          <option value="{{ eq.id }}">
+          <option value="{{ eq.id }}" {% if selected_equipment_id|string == eq.id|string %}selected{% endif %}>
             {{ eq.name }} / {{ eq.equipment_type }}{% if eq.service_type %} / {{ eq.service_type }}{% endif %} - {{ eq.account.name }}
           </option>
           {% endfor %}
@@ -40,6 +44,23 @@
           Mark equipment as <strong>Working</strong> after this service
         </label>
       </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="vendor">Done by</label>
+        <input type="text" id="vendor" name="vendor" class="form-control" maxlength="120"
+               placeholder="Staff name or vendor" />
+      </div>
+      <div class="form-group">
+        <label for="cost">Cost</label>
+        <input type="number" id="cost" name="cost" class="form-control" min="0" step="0.01" placeholder="Optional" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="invoice_ref">Invoice / ref</label>
+      <input type="text" id="invoice_ref" name="invoice_ref" class="form-control" maxlength="120" placeholder="Optional" />
     </div>
 
     <div class="form-group">

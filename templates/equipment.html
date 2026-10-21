@@ -45,18 +45,21 @@
     <tbody>
       {% for item in items %}
       <tr>
-        <td class="bold">{{ item.name }}<small class="record-id">{{ item.equip_id or 'ID pending' }}</small></td>
+        <td class="bold"><a href="{{ url_for('equipment_detail', item_id=item.id) }}">{{ item.name }}</a><small class="record-id">{{ item.equip_id or 'ID pending' }}</small></td>
         <td>{{ item.equipment_type }}</td>
         <td>{{ item.service_type or '-' }}</td>
         <td>{{ item.account.name }}</td>
         <td>{{ item.quantity }}</td>
         <td><span class="badge badge-{{ item.item_status }}">{{ item.item_status.replace('_', ' ').title() }}</span></td>
-        <td>{{ item.last_service_date.strftime('%b %d, %Y') if item.last_service_date else '-' }}</td>
+        <td>{{ item.last_service_date.strftime('%b %d, %Y') if item.last_service_date else '-' }}{% if item.next_due %}<small class="record-id">Next {{ item.next_due.strftime('%b %d, %Y') }}</small>{% endif %}</td>
         <td class="actions-cell">
+          <a href="{{ url_for('equipment_detail', item_id=item.id) }}" class="btn btn-sm btn-outline">View</a>
+          <button type="button" class="btn btn-sm btn-outline copy-link" data-url="{{ url_for('equipment_detail', item_id=item.id, _external=True) }}">Copy link</button>
           <a href="{{ url_for('edit_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Edit</a>
           <a href="{{ url_for('transfer_equipment', item_id=item.id) }}" class="btn btn-sm btn-outline">Transfer</a>
           <form method="POST" action="{{ url_for('delete_equipment', item_id=item.id) }}"
                 onsubmit="return confirm('Delete this equipment and its maintenance history? This cannot be undone.');" style="display:inline;">
+            {% include "_csrf.html" %}
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
           </form>
         </td>

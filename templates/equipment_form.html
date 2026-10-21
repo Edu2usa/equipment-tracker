@@ -9,6 +9,7 @@
 
 <div class="card form-card">
   <form method="POST">
+    {% include "_csrf.html" %}
     {% if selected_account %}
     <div class="equip-id-badge">
       <span class="equip-id-label">Adding For</span>
@@ -115,7 +116,32 @@
         <input type="date" id="last_service_date" name="last_service_date" class="form-control"
                value="{{ item.last_service_date.isoformat() if item and item.last_service_date else '' }}" />
       </div>
-      <div class="form-group"></div>
+      <div class="form-group">
+        <label for="service_interval_days">Service interval (days)</label>
+        <input type="number" id="service_interval_days" name="service_interval_days" class="form-control"
+               min="1" step="1" placeholder="Leave blank if there is no schedule"
+               value="{{ item.service_interval_days if item and item.service_interval_days else '' }}" />
+        <p class="field-help">Next due is the last service date plus this many days.</p>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="serial_number">Serial number</label>
+        <input type="text" id="serial_number" name="serial_number" class="form-control" maxlength="120"
+               value="{{ item.serial_number if item and item.serial_number else '' }}" />
+      </div>
+      <div class="form-group">
+        <label for="purchase_date">Purchase date</label>
+        <input type="date" id="purchase_date" name="purchase_date" class="form-control"
+               value="{{ item.purchase_date.isoformat() if item and item.purchase_date else '' }}" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" class="form-control" rows="3"
+                placeholder="Anything staff should know about this machine">{{ item.notes if item and item.notes else '' }}</textarea>
     </div>
 
     <div class="form-actions">

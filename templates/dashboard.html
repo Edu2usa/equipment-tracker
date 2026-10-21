@@ -31,7 +31,7 @@
 <section class="card mt-4">
   <div class="panel-heading"><div><p class="eyebrow">Keep work moving</p><h2>Repair watch</h2></div><span class="badge badge-in_repair">{{ in_repair }} units</span></div>
   {% for item in equipment_list if item.item_status == 'in_repair' %}
-  <a class="activity-row" href="{{ url_for('edit_equipment', item_id=item.id) }}"><span><strong>{{ item.name }}</strong><small>{{ item.account.name }} &middot; {{ item.equip_id or 'ID pending' }}</small></span><span class="badge badge-in_repair">{{ item.quantity }} in repair</span></a>
+  <a class="activity-row" href="{{ url_for('equipment_detail', item_id=item.id) }}"><span><strong>{{ item.name }}</strong><small>{{ item.account.name }} &middot; {{ item.equip_id or 'ID pending' }}</small></span><span class="badge badge-in_repair">{{ item.quantity }} in repair</span></a>
   {% else %}<div class="empty-panel"><span class="empty-symbol">&#10003;</span><h3>No equipment marked in repair</h3><p>Update equipment status when a unit needs service.</p></div>{% endfor %}
 </section>
 

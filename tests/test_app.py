@@ -18,6 +18,27 @@ class EquipmentTests(unittest.TestCase):
         self.context.push()
         db.create_all()
         self.client = app.test_client()
+        raw_post = self.client.post
+
+        def post(path, data=None, **kwargs):
+            if kwargs.get('json') is not None or str(path).startswith('/api/'):
+                return raw_post(path, data=data, **kwargs)
+            if data is None:
+                payload = {}
+            elif isinstance(data, dict):
+                payload = dict(data)
+            else:
+                return raw_post(path, data=data, **kwargs)
+            if 'csrf_token' not in payload:
+                with self.client.session_transaction() as sess:
+                    token = sess.get('_csrf')
+                    if not token:
+                        token = 'csrf-test-token'
+                        sess['_csrf'] = token
+                payload['csrf_token'] = token
+            return raw_post(path, data=payload, **kwargs)
+
+        self.client.post = post
         self.account = Account(name='Test site', account_type='client', location='Brookfield')
         db.session.add(self.account)
         db.session.commit()

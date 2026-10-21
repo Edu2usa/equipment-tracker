@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Form expired - Preferred Maintenance{% endblock %}
+
+{% block content %}
+<section class="card setup-card">
+  <p class="eyebrow">Try that again</p>
+  <h1>That form expired</h1>
+  <p>Go back, reload the page, and submit it again. Nothing was saved.</p>
+  <a class="btn btn-primary mt-4" href="{{ url_for('dashboard') }}">Back to the start</a>
+</section>
+{% endblock %}
