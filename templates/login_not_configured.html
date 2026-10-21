@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Sign-in not configured - Preferred Maintenance{% endblock %}
+
+{% block content %}
+<section class="card setup-card">
+  <p class="eyebrow">Setup required</p>
+  <h1>Sign-in is not configured</h1>
+  <p>This copy of Equipment Tracker will not open until the server has a shared username, a shared password, and a secret key.</p>
+  <div class="setup-steps">
+    <h2>Set these in Vercel, then redeploy</h2>
+    <ul>
+      <li><code>APP_LOGIN_USER</code></li>
+      <li><code>APP_LOGIN_PASSWORD</code></li>
+      <li><code>SECRET_KEY</code></li>
+    </ul>
+    <p>Do not put those values in the project files. The bot also needs <code>TRACKER_API_TOKEN</code> before <code>/api</code> will answer.</p>
+  </div>
+</section>
+{% endblock %}

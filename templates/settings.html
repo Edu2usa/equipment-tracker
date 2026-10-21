@@ -16,6 +16,7 @@
     </div>
 
     <form method="post" action="{{ url_for('add_equip_name') }}" class="inline-add-form">
+      {% include "_csrf.html" %}
       <input type="text" name="name" placeholder="New equipment name..." class="form-input" required>
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
     </form>
@@ -24,11 +25,13 @@
       {% for rec in names %}
       <li class="settings-item">
         <form method="post" action="{{ url_for('edit_equip_name', name_id=rec.id) }}" class="settings-edit-form">
+          {% include "_csrf.html" %}
           <input type="text" name="name" value="{{ rec.name }}" class="form-input form-input-sm" required>
           <button type="submit" class="btn btn-sm btn-outline">Save</button>
         </form>
         <form method="post" action="{{ url_for('delete_equip_name', name_id=rec.id) }}"
               onsubmit="return confirm('Delete {{ rec.name }}?')">
+          {% include "_csrf.html" %}
           <button type="submit" class="btn btn-sm btn-danger">Delete</button>
         </form>
       </li>
@@ -45,6 +48,7 @@
     </div>
 
     <form method="post" action="{{ url_for('add_equip_type') }}" class="inline-add-form">
+      {% include "_csrf.html" %}
       <input type="text" name="name" placeholder="New equipment model..." class="form-input" required>
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
     </form>
@@ -53,11 +57,13 @@
       {% for rec in types %}
       <li class="settings-item">
         <form method="post" action="{{ url_for('edit_equip_type', type_id=rec.id) }}" class="settings-edit-form">
+          {% include "_csrf.html" %}
           <input type="text" name="name" value="{{ rec.name }}" class="form-input form-input-sm" required>
           <button type="submit" class="btn btn-sm btn-outline">Save</button>
         </form>
         <form method="post" action="{{ url_for('delete_equip_type', type_id=rec.id) }}"
               onsubmit="return confirm('Delete {{ rec.name }}?')">
+          {% include "_csrf.html" %}
           <button type="submit" class="btn btn-sm btn-danger">Delete</button>
         </form>
       </li>
@@ -74,6 +80,7 @@
     </div>
 
     <form method="post" action="{{ url_for('add_service_type') }}" class="inline-add-form">
+      {% include "_csrf.html" %}
       <input type="text" name="name" placeholder="New service type..." class="form-input" required>
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
     </form>
@@ -82,11 +89,13 @@
       {% for rec in service_types %}
       <li class="settings-item">
         <form method="post" action="{{ url_for('edit_service_type', service_type_id=rec.id) }}" class="settings-edit-form">
+          {% include "_csrf.html" %}
           <input type="text" name="name" value="{{ rec.name }}" class="form-input form-input-sm" required>
           <button type="submit" class="btn btn-sm btn-outline">Save</button>
         </form>
         <form method="post" action="{{ url_for('delete_service_type', service_type_id=rec.id) }}"
               onsubmit="return confirm('Delete {{ rec.name }}?')">
+          {% include "_csrf.html" %}
           <button type="submit" class="btn btn-sm btn-danger">Delete</button>
         </form>
       </li>

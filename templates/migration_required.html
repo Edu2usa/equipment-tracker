@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Database update required - Preferred Maintenance{% endblock %}
+
+{% block content %}
+<section class="card setup-card">
+  <p class="eyebrow">One-time database update</p>
+  <h1>The database needs the new columns before this version can run</h1>
+  <p>No records were changed. In the Supabase SQL Editor, run <code>supabase/migrations/20261021_service_nfc_login_lockouts.sql</code> as the database owner, then reload this page.</p>
+  <p>Run that file before deploying this version of the app. The app login cannot change tables by itself.</p>
+</section>
+{% endblock %}

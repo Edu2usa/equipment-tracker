@@ -24,7 +24,7 @@ class SchemaTests(unittest.TestCase):
 from models import db, EquipmentItem
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.dialects import postgresql
-assert len(db.metadata.tables) == 6
+assert len(db.metadata.tables) == 7
 for table in db.metadata.tables.values():
     assert table.schema == 'equipment_tracker'
     for foreign_key in table.foreign_keys:

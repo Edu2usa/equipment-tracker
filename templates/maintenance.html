@@ -28,6 +28,9 @@
         <th>ACCOUNT</th>
         <th>TYPE</th>
         <th>DATE</th>
+        <th>DONE BY</th>
+        <th>COST</th>
+        <th>INVOICE / REF</th>
         <th>NOTES</th>
         <th>ACTIONS</th>
       </tr>
@@ -41,16 +44,20 @@
         <td>{{ r.equipment.account.name }}</td>
         <td>{{ r.maintenance_type }}</td>
         <td>{{ r.service_date.strftime('%b %d, %Y') }}</td>
+        <td>{{ r.vendor or '—' }}</td>
+        <td>{% if r.cost is not none %}${{ '%.2f'|format(r.cost) }}{% else %}—{% endif %}</td>
+        <td>{{ r.invoice_ref or '—' }}</td>
         <td class="notes-cell">{{ r.notes or '—' }}</td>
         <td class="actions-cell">
           <form method="POST" action="{{ url_for('delete_maintenance', record_id=r.id) }}"
                 onsubmit="return confirm('Delete this record?');" style="display:inline;">
+            {% include "_csrf.html" %}
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="empty-row">No maintenance records yet. <a href="{{ url_for('add_maintenance') }}">Log one.</a></td></tr>
+      <tr><td colspan="11" class="empty-row">No maintenance records yet. <a href="{{ url_for('add_maintenance') }}">Log one.</a></td></tr>
       {% endfor %}
     </tbody>
   </table>

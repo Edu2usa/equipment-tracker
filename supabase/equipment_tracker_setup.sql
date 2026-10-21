@@ -37,7 +37,11 @@ CREATE TABLE equipment_tracker.equipment_items (
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
   item_status VARCHAR(50) NOT NULL DEFAULT 'working'
     CHECK (item_status IN ('working','in_repair','in_storage')),
-  last_service_date DATE
+  last_service_date DATE,
+  service_interval_days INTEGER CHECK (service_interval_days IS NULL OR service_interval_days > 0),
+  serial_number VARCHAR(120),
+  purchase_date DATE,
+  notes TEXT
 );
 CREATE TABLE equipment_tracker.maintenance_records (
   id SERIAL PRIMARY KEY,
@@ -45,7 +49,21 @@ CREATE TABLE equipment_tracker.maintenance_records (
   maintenance_type VARCHAR(80) NOT NULL,
   service_date DATE NOT NULL DEFAULT CURRENT_DATE,
   notes TEXT,
+  cost NUMERIC(12, 2) CHECK (cost IS NULL OR cost >= 0),
+  vendor VARCHAR(120),
+  invoice_ref VARCHAR(120),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE equipment_tracker.login_lockouts (
+  id SERIAL PRIMARY KEY,
+  bucket VARCHAR(16) NOT NULL,
+  bucket_key VARCHAR(64) NOT NULL,
+  failures INTEGER NOT NULL DEFAULT 0,
+  window_started TIMESTAMP,
+  locked_until TIMESTAMP,
+  lockout_level INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT login_lockouts_bucket_key UNIQUE (bucket, bucket_key)
 );
 CREATE TABLE equipment_tracker.equipment_names (id SERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL UNIQUE);
 CREATE TABLE equipment_tracker.equipment_types (id SERIAL PRIMARY KEY, name VARCHAR(80) NOT NULL UNIQUE);
@@ -63,7 +81,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA equipment_tracker TO pm_equipment
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['accounts','equipment_items','maintenance_records','equipment_names','equipment_types','equipment_service_types'] LOOP
+  FOREACH t IN ARRAY ARRAY['accounts','equipment_items','maintenance_records','equipment_names','equipment_types','equipment_service_types','login_lockouts'] LOOP
     EXECUTE format('ALTER TABLE equipment_tracker.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY equipment_backend_access ON equipment_tracker.%I FOR ALL TO pm_equipment_app USING (true) WITH CHECK (true)', t);
   END LOOP;

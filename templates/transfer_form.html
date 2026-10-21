@@ -19,6 +19,7 @@
   </div>
 
   <form method="POST">
+    {% include "_csrf.html" %}
     <div class="form-group">
       <label for="account_id">Transfer To</label>
       <select id="account_id" name="account_id" class="form-control" required>

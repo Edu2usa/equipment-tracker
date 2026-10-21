@@ -18,7 +18,7 @@
   <!-- ── NAV ────────────────────────────────────────────────────── -->
   <header class="site-header">
     <div class="header-inner">
-      <a href="{{ url_for('dashboard') }}" class="logo-link">
+      <a href="{{ url_for('dashboard') if signed_in or not login_required else url_for('login') }}" class="logo-link">
         <img src="{{ url_for('static', filename='img/preferred-maintenance-logo.png') }}" alt="Preferred Maintenance" class="logo-img">
         <span class="logo-text">
           <span class="logo-preferred">Preferred Maintenance</span>
@@ -26,14 +26,20 @@
         </span>
       </a>
 
+      {% if signed_in %}
       <nav class="main-nav" aria-label="Main navigation">
         <a href="{{ url_for('dashboard') }}"   class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
         <a href="{{ url_for('accounts') }}"    class="nav-link {% if 'account' in endpoint %}active{% endif %}">Accounts</a>
-        <a href="{{ url_for('equipment') }}"   class="nav-link {% if request.endpoint in ['equipment','add_equipment','edit_equipment','delete_equipment','transfer_equipment'] %}active{% endif %}">Equipment</a>
+        <a href="{{ url_for('equipment') }}"   class="nav-link {% if request.endpoint in ['equipment','equipment_detail','add_equipment','edit_equipment','delete_equipment','transfer_equipment'] %}active{% endif %}">Equipment</a>
         <a href="{{ url_for('maintenance') }}" class="nav-link {% if 'maintenance' in endpoint %}active{% endif %}">Maintenance</a>
         <a href="{{ url_for('reports') }}"     class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
         <a href="{{ url_for('settings') }}"    class="nav-link {% if 'settings' in endpoint or 'equip_name' in endpoint or 'equip_type' in endpoint or 'service_type' in endpoint %}active{% endif %}">Settings</a>
+        <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+          {% include "_csrf.html" %}
+          <button type="submit" class="nav-link logout-button">Log out</button>
+        </form>
       </nav>
+      {% endif %}
     </div>
   </header>
 
@@ -56,6 +62,24 @@
   <footer class="site-footer">
     <p>&copy; {{ 2026 }} Preferred Maintenance &mdash; Equipment Tracker</p>
   </footer>
-
+  <script>
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('.copy-link');
+      if (!button) return;
+      var url = button.getAttribute('data-url');
+      var previous = button.textContent;
+      var done = function () {
+        button.textContent = 'Copied';
+        window.setTimeout(function () { button.textContent = previous; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(function () {
+          window.prompt('Copy this link', url);
+        });
+      } else {
+        window.prompt('Copy this link', url);
+      }
+    });
+  </script>
 </body>
 </html>
